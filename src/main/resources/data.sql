@@ -1,19 +1,22 @@
 -- =============================================================================
 -- SCRIPT DML (DATOS SEMILLA): EMPRESA DE TRANSPORTE "EL CHINO" (LIMA, PERÚ)
--- Contraseña común de prueba para todos los usuarios semilla: ElChino2026!
--- Hash BCrypt ($2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a -> "admin123")
+-- Contraseña común de prueba para todos los usuarios semilla: admin123
+-- Hash BCrypt ($2a$10$scCFkeecnubyHb74Db51MOKqc9Zqpn8Mg7fZeLeev841TfD2nlq5a -> "admin123")
 -- =============================================================================
 
 -- 1. USUARIOS POR ROL (Contraseña en texto plano para pruebas: admin123)
 INSERT INTO usuario (username, password_hash, nombres, apellidos, email, rol, estado, intentos_fallidos)
 VALUES
-('admin', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a', 'Carlos Alberto', 'Mendoza Quispe', 'cmendoza@elchino.pe', 'ADMINISTRADOR', 'ACTIVO', 0),
-('jefe.taller', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a', 'Roberto', 'Huamán Rojas', 'rhuaman@elchino.pe', 'RESPONSABLE_MANTENIMIENTO', 'ACTIVO', 0),
-('tecnico1', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a', 'Miguel Ángel', 'Paredes Soto', 'mparedes@elchino.pe', 'TECNICO', 'ACTIVO', 0),
-('tecnico2', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a', 'Jorge Luis', 'Chávez Díaz', 'jchavez@elchino.pe', 'TECNICO', 'ACTIVO', 0),
-('operaciones', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a', 'Lucía Fernanda', 'Salazar Vega', 'lsalazar@elchino.pe', 'OPERACIONES', 'ACTIVO', 0),
-('conductor1', '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a', 'Pedro Pablo', 'Cárdenas Silva', 'pcardenas@elchino.pe', 'CONDUCTOR', 'ACTIVO', 0)
-ON CONFLICT (username) DO NOTHING;
+('admin', '$2a$10$scCFkeecnubyHb74Db51MOKqc9Zqpn8Mg7fZeLeev841TfD2nlq5a', 'Carlos Alberto', 'Mendoza Quispe', 'cmendoza@elchino.pe', 'ADMINISTRADOR', 'ACTIVO', 0),
+('jefe.taller', '$2a$10$scCFkeecnubyHb74Db51MOKqc9Zqpn8Mg7fZeLeev841TfD2nlq5a', 'Roberto', 'Huamán Rojas', 'rhuaman@elchino.pe', 'RESPONSABLE_MANTENIMIENTO', 'ACTIVO', 0),
+('tecnico1', '$2a$10$scCFkeecnubyHb74Db51MOKqc9Zqpn8Mg7fZeLeev841TfD2nlq5a', 'Miguel Ángel', 'Paredes Soto', 'mparedes@elchino.pe', 'TECNICO', 'ACTIVO', 0),
+('tecnico2', '$2a$10$scCFkeecnubyHb74Db51MOKqc9Zqpn8Mg7fZeLeev841TfD2nlq5a', 'Jorge Luis', 'Chávez Díaz', 'jchavez@elchino.pe', 'TECNICO', 'ACTIVO', 0),
+('operaciones', '$2a$10$scCFkeecnubyHb74Db51MOKqc9Zqpn8Mg7fZeLeev841TfD2nlq5a', 'Lucía Fernanda', 'Salazar Vega', 'lsalazar@elchino.pe', 'OPERACIONES', 'ACTIVO', 0),
+('conductor1', '$2a$10$scCFkeecnubyHb74Db51MOKqc9Zqpn8Mg7fZeLeev841TfD2nlq5a', 'Pedro Pablo', 'Cárdenas Silva', 'pcardenas@elchino.pe', 'CONDUCTOR', 'ACTIVO', 0)
+ON CONFLICT (username) DO UPDATE SET
+    password_hash = EXCLUDED.password_hash,
+    intentos_fallidos = 0,
+    bloqueado_hasta = NULL;
 
 -- 2. UNIDADES DE TRANSPORTE (FLOTA RUTA EVITAMIENTO - VILLA EL SALVADOR / PUENTE PIEDRA)
 INSERT INTO unidad (codigo_interno, placa, marca, modelo, anio_fabricacion, kilometraje_actual, estado)
