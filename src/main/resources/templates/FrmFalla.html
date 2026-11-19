@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Reporte y Gestión de Fallas')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <h3 class="fw-bold mb-3">🚨 Reporte y Priorización de Fallas (CUS05)</h3>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white fw-bold">Reportar Falla / Incidencia</div>
+                <div class="card-body">
+                    <form th:action="@{/fallas/guardar}" th:object="${fallaDTO}" method="post">
+                        <input type="hidden" th:field="*{idInspeccion}">
+                        <div class="mb-2">
+                            <label class="form-label">Unidad Afectada</label>
+                            <select th:field="*{idUnidad}" class="form-select" required>
+                                <option th:each="u : ${unidades}" th:value="${u.idUnidad}"
+                                        th:text="${u.codigoInterno} + ' (' + ${u.placa} + ')'"></option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Título de la Avería</label>
+                            <input type="text" th:field="*{titulo}" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Sistema Afectado</label>
+                            <select th:field="*{sistemaAfectado}" class="form-select">
+                                <option value="Frenos">Frenos</option>
+                                <option value="Motor">Motor</option>
+                                <option value="Transmisión">Transmisión</option>
+                                <option value="Suspensión">Suspensión</option>
+                                <option value="Sistema Eléctrico">Sistema Eléctrico</option>
+                                <option value="Carrocería">Carrocería</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Prioridad (ALTA/CRITICA pasa unidad a Taller)</label>
+                            <select th:field="*{prioridad}" class="form-select">
+                                <option value="BAJA">BAJA</option>
+                                <option value="MEDIA">MEDIA</option>
+                                <option value="ALTA">ALTA</option>
+                                <option value="CRITICA">CRITICA</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción de Síntomas</label>
+                            <textarea th:field="*{descripcion}" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100">Registrar Falla</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Listado de Fallas Reportadas</div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Unidad</th>
+                            <th>Título / Sistema</th>
+                            <th>Prioridad</th>
+                            <th>Estado</th>
+                            <th>Reportado por</th>
+                            <th sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO')">Priorizar</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="f : ${fallas}">
+                            <td th:text="${f.idFalla}">1</td>
+                            <td class="fw-bold" th:text="${f.unidadDescripcion}">CH-102</td>
+                            <td>
+                                <strong th:text="${f.titulo}">Título</strong><br>
+                                <small class="text-muted" th:text="${f.sistemaAfectado}">Frenos</small>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${f.prioridad == 'CRITICA' or f.prioridad == 'ALTA'} ? 'bg-danger' : 'bg-info text-dark'"
+                                      th:text="${f.prioridad}">ALTA</span>
+                            </td>
+                            <td><span class="badge bg-secondary" th:text="${f.estado}">REPORTADA</span></td>
+                            <td th:text="${f.usuarioReportaNombre}">Conductor</td>
+                            <td sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO')">
+                                <form th:action="@{/fallas/{id}/priorizar(id=${f.idFalla})}" method="post" class="d-flex gap-1">
+                                    <select name="prioridad" class="form-select form-select-sm">
+                                        <option value="BAJA">BAJA</option>
+                                        <option value="MEDIA">MEDIA</option>
+                                        <option value="ALTA">ALTA</option>
+                                        <option value="CRITICA">CRITICA</option>
+                                    </select>
+                                    <select name="estado" class="form-select form-select-sm">
+                                        <option value="REPORTADA">REPORTADA</option>
+                                        <option value="EN_ATENCION">EN_ATENCION</option>
+                                        <option value="RESUELTA">RESUELTA</option>
+                                        <option value="CERRADA">CERRADA</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">OK</button>
+                                </form>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

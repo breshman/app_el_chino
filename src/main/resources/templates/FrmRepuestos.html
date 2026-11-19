@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Inventario de Repuestos')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <h3 class="fw-bold mb-3">📦 Inventario de Repuestos y Control de Stock (CUS08)</h3>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Registrar Repuesto</div>
+                <div class="card-body">
+                    <form th:action="@{/repuestos/guardar}" th:object="${repuestoDTO}" method="post">
+                        <div class="mb-2">
+                            <label class="form-label">Código SKU</label>
+                            <input type="text" th:field="*{codigoSku}" class="form-control" placeholder="REP-FR-010" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Nombre del Repuesto</label>
+                            <input type="text" th:field="*{nombre}" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Categoría</label>
+                            <input type="text" th:field="*{categoria}" class="form-control" placeholder="Frenos" required>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col">
+                                <label class="form-label">Stock Actual</label>
+                                <input type="number" th:field="*{stock}" class="form-control" value="10" required>
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Stock Mínimo</label>
+                                <input type="number" th:field="*{stockMinimo}" class="form-control" value="5" required>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label class="form-label">Precio Unit. (S/)</label>
+                                <input type="number" step="0.01" th:field="*{precioUnitario}" class="form-control" required>
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Unidad Medida</label>
+                                <input type="text" th:field="*{unidadMedida}" class="form-control" value="UNIDAD" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Guardar Repuesto</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Catálogo General de Almacén</div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>SKU</th>
+                            <th>Nombre</th>
+                            <th>Categoría</th>
+                            <th>Stock</th>
+                            <th>Mínimo</th>
+                            <th>Precio (S/)</th>
+                            <th>Estado Inventario</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="r : ${repuestos}">
+                            <td class="fw-bold" th:text="${r.codigoSku}">SKU</td>
+                            <td th:text="${r.nombre}">Nombre</td>
+                            <td th:text="${r.categoria}">Cat</td>
+                            <td class="fw-bold" th:text="${r.stock}">10</td>
+                            <td th:text="${r.stockMinimo}">5</td>
+                            <td th:text="'S/ ' + ${r.precioUnitario}">S/ 0.00</td>
+                            <td>
+                                <span th:if="${r.bajoStock}" class="badge bg-danger">⚠️ ALERTA BAJO STOCK</span>
+                                <span th:unless="${r.bajoStock}" class="badge bg-success">NORMAL</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

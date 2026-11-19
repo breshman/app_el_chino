@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Gestión de Usuarios')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <h3 class="fw-bold mb-3">👤 Gestión de Usuarios y Roles (CUS01 / RNF01)</h3>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Registrar Usuario (BCrypt)</div>
+                <div class="card-body">
+                    <form th:action="@{/usuarios/guardar}" th:object="${usuarioDTO}" method="post">
+                        <div class="mb-2">
+                            <label class="form-label">Username</label>
+                            <input type="text" th:field="*{username}" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Contraseña</label>
+                            <input type="password" th:field="*{password}" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Nombres</label>
+                            <input type="text" th:field="*{nombres}" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Apellidos</label>
+                            <input type="text" th:field="*{apellidos}" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Email</label>
+                            <input type="email" th:field="*{email}" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Rol Operativo</label>
+                            <select th:field="*{rol}" class="form-select">
+                                <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+                                <option value="RESPONSABLE_MANTENIMIENTO">RESPONSABLE_MANTENIMIENTO</option>
+                                <option value="TECNICO">TECNICO</option>
+                                <option value="OPERACIONES">OPERACIONES</option>
+                                <option value="CONDUCTOR">CONDUCTOR</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Guardar Usuario</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Nómina de Usuarios</div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Colaborador</th>
+                            <th>Rol</th>
+                            <th>Estado</th>
+                            <th>Intentos</th>
+                            <th>Acción</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="u : ${usuarios}">
+                            <td th:text="${u.idUsuario}">1</td>
+                            <td class="fw-bold" th:text="${u.username}">admin</td>
+                            <td th:text="${u.nombreCompleto}">Nombre</td>
+                            <td><span class="badge bg-secondary" th:text="${u.rol}">ROL</span></td>
+                            <td>
+                                <span class="badge" th:classappend="${u.estado == 'ACTIVO'} ? 'bg-success' : 'bg-danger'"
+                                      th:text="${u.estado}">ACTIVO</span>
+                            </td>
+                            <td th:text="${u.intentosFallidos}">0</td>
+                            <td>
+                                <form th:action="@{/usuarios/{id}/estado(id=${u.idUsuario})}" method="post" class="d-inline">
+                                    <input type="hidden" name="estado" th:value="${u.estado == 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Cambiar / Desbloquear</button>
+                                </form>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

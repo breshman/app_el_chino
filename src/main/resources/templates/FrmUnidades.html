@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Flota de Unidades')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <h3 class="fw-bold mb-3">🚌 Control de Unidades de Transporte (CUS02 / CUS03)</h3>
+    <div class="row g-4">
+        <div class="col-md-4" sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO','OPERACIONES')">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Registrar Unidad</div>
+                <div class="card-body">
+                    <form th:action="@{/unidades/guardar}" th:object="${unidadDTO}" method="post">
+                        <div class="mb-2">
+                            <label class="form-label">Código Interno</label>
+                            <input type="text" th:field="*{codigoInterno}" class="form-control" placeholder="CH-106" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Placa</label>
+                            <input type="text" th:field="*{placa}" class="form-control" placeholder="A1B-799" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Marca</label>
+                            <input type="text" th:field="*{marca}" class="form-control" placeholder="Mercedes-Benz" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Modelo</label>
+                            <input type="text" th:field="*{modelo}" class="form-control" placeholder="OF-1721" required>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col">
+                                <label class="form-label">Año</label>
+                                <input type="number" th:field="*{anioFabricacion}" class="form-control" value="2023" required>
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Kilometraje</label>
+                                <input type="number" th:field="*{kilometrajeActual}" class="form-control" value="0" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Estado Inicial</label>
+                            <select th:field="*{estado}" class="form-select">
+                                <option value="OPERATIVA">OPERATIVA</option>
+                                <option value="EN_MANTENIMIENTO">EN_MANTENIMIENTO</option>
+                                <option value="FUERA_DE_SERVICIO">FUERA_DE_SERVICIO</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Guardar Unidad</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">Unidades Registradas</span>
+                    <div>
+                        <a th:href="@{/unidades}" class="btn btn-sm btn-outline-secondary">Todas</a>
+                        <a th:href="@{/unidades(estado='OPERATIVA')}" class="btn btn-sm btn-outline-success">Operativas</a>
+                        <a th:href="@{/unidades(estado='EN_MANTENIMIENTO')}" class="btn btn-sm btn-outline-warning">En Taller</a>
+                    </div>
+                </div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Código</th>
+                            <th>Placa</th>
+                            <th>Marca / Modelo</th>
+                            <th>Año</th>
+                            <th>Kilometraje</th>
+                            <th>Estado</th>
+                            <th>Cambiar Estado (QA-05)</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="u : ${unidades}">
+                            <td class="fw-bold" th:text="${u.codigoInterno}">CH-101</td>
+                            <td th:text="${u.placa}">A1B-710</td>
+                            <td th:text="${u.marca} + ' ' + ${u.modelo}">MB</td>
+                            <td th:text="${u.anioFabricacion}">2021</td>
+                            <td th:text="${u.kilometrajeActual} + ' km'">0 km</td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${u.estado == 'OPERATIVA'} ? 'bg-success' : (${u.estado == 'EN_MANTENIMIENTO'} ? 'bg-warning text-dark' : 'bg-danger')"
+                                      th:text="${u.estado}">OPERATIVA</span>
+                            </td>
+                            <td>
+                                <form th:action="@{/unidades/{id}/estado(id=${u.idUnidad})}" method="post" class="d-flex gap-1">
+                                    <select name="nuevoEstado" class="form-select form-select-sm">
+                                        <option value="OPERATIVA">OPERATIVA</option>
+                                        <option value="EN_MANTENIMIENTO">EN_MANTENIMIENTO</option>
+                                        <option value="FUERA_DE_SERVICIO">FUERA_DE_SERVICIO</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-primary">Aplicar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

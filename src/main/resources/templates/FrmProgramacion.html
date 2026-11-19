@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Programación de Mantenimientos')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <h3 class="fw-bold mb-3">📅 Programación de Mantenimientos (CUS06 / CUS11)</h3>
+    <div class="row g-4">
+        <div class="col-md-4" sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO')">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Programar Orden (Valida Horario Técnico)</div>
+                <div class="card-body">
+                    <form th:action="@{/mantenimientos/programar}" th:object="${mantenimientoDTO}" method="post">
+                        <div class="mb-2">
+                            <label class="form-label">Unidad</label>
+                            <select th:field="*{idUnidad}" class="form-select" required>
+                                <option th:each="u : ${unidades}" th:value="${u.idUnidad}"
+                                        th:text="${u.codigoInterno} + ' (' + ${u.placa} + ')'"></option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Falla Asociada (Opcional)</label>
+                            <select th:field="*{idFalla}" class="form-select">
+                                <option value="">-- Sin falla (Preventivo) --</option>
+                                <option th:each="f : ${fallasActivas}" th:value="${f.idFalla}"
+                                        th:text="'#' + ${f.idFalla} + ' - ' + ${f.unidadDescripcion} + ': ' + ${f.titulo}"></option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Técnico Asignado</label>
+                            <select th:field="*{idTecnico}" class="form-select" required>
+                                <option th:each="t : ${tecnicos}" th:value="${t.idUsuario}"
+                                        th:text="${t.nombreCompleto}"></option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Tipo</label>
+                            <select th:field="*{tipoMantenimiento}" class="form-select">
+                                <option value="CORRECTIVO">CORRECTIVO</option>
+                                <option value="PREVENTIVO">PREVENTIVO</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Fecha y Hora Programada</label>
+                            <input type="datetime-local" th:field="*{fechaProgramada}" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción del Trabajo</label>
+                            <textarea th:field="*{descripcionTrabajo}" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Programar Mantenimiento</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Cronograma de Mantenimientos</div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Unidad</th>
+                            <th>Tipo</th>
+                            <th>Técnico</th>
+                            <th>Programado</th>
+                            <th>Trabajo</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="m : ${mantenimientos}">
+                            <td th:text="${m.idMantenimiento}">1</td>
+                            <td class="fw-bold" th:text="${m.unidadDescripcion}">CH-102</td>
+                            <td th:text="${m.tipoMantenimiento}">CORRECTIVO</td>
+                            <td th:text="${m.tecnicoNombre}">Técnico</td>
+                            <td th:text="${#temporals.format(m.fechaProgramada, 'dd/MM/yyyy HH:mm')}">Fecha</td>
+                            <td th:text="${m.descripcionTrabajo}">Trabajo</td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${m.estado == 'FINALIZADO'} ? 'bg-success' : 'bg-warning text-dark'"
+                                      th:text="${m.estado}">PROGRAMADO</span>
+                            </td>
+                            <td>
+                                <a th:if="${m.estado != 'FINALIZADO'}"
+                                   th:href="@{/reparaciones(idMantenimiento=${m.idMantenimiento})}"
+                                   class="btn btn-sm btn-primary">Registrar Reparación</a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

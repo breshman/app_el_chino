@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Inspecciones Técnicas')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <h3 class="fw-bold mb-3">🔍 Inspecciones Técnicas de Unidades (CUS04)</h3>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Nueva Inspección Técnica</div>
+                <div class="card-body">
+                    <form th:action="@{/inspecciones/guardar}" th:object="${inspeccionDTO}" method="post">
+                        <div class="mb-2">
+                            <label class="form-label">Unidad</label>
+                            <select th:field="*{idUnidad}" class="form-select" required>
+                                <option th:each="u : ${unidades}" th:value="${u.idUnidad}"
+                                        th:text="${u.codigoInterno} + ' - ' + ${u.placa}"></option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Tipo de Inspección</label>
+                            <select th:field="*{tipoInspeccion}" class="form-select">
+                                <option value="RUTINARIA">RUTINARIA</option>
+                                <option value="PREVENTIVA">PREVENTIVA</option>
+                                <option value="EXTRAORDINARIA">EXTRAORDINARIA</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Kilometraje Registrado</label>
+                            <input type="number" th:field="*{kilometrajeRegistrado}" class="form-control" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Resultado (CUS04 &rarr; CUS05)</label>
+                            <select th:field="*{resultado}" class="form-select">
+                                <option value="CONFORME">CONFORME</option>
+                                <option value="CON_OBSERVACIONES">CON_OBSERVACIONES (Encadena a Falla)</option>
+                                <option value="NO_CONFORME">NO_CONFORME (Encadena a Falla)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Observaciones Técnicas</label>
+                            <textarea th:field="*{observaciones}" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Registrar Inspección</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Bitácora de Inspecciones</div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Unidad</th>
+                            <th>Tipo</th>
+                            <th>Km</th>
+                            <th>Inspector</th>
+                            <th>Fecha</th>
+                            <th>Resultado</th>
+                            <th>Observaciones</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="i : ${inspecciones}">
+                            <td th:text="${i.idInspeccion}">1</td>
+                            <td class="fw-bold" th:text="${i.unidadDescripcion}">CH-102</td>
+                            <td th:text="${i.tipoInspeccion}">RUTINARIA</td>
+                            <td th:text="${i.kilometrajeRegistrado}">100000</td>
+                            <td th:text="${i.inspectorNombre}">Inspector</td>
+                            <td th:text="${#temporals.format(i.fechaInspeccion, 'dd/MM/yyyy HH:mm')}">Fecha</td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${i.resultado == 'CONFORME'} ? 'bg-success' : 'bg-danger'"
+                                      th:text="${i.resultado}">CONFORME</span>
+                            </td>
+                            <td th:text="${i.observaciones}">Obs</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

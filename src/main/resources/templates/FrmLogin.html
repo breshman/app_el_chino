@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Iniciar Sesión')}"></head>
+<body class="d-flex align-items-center justify-content-center vh-100 bg-dark">
+<div class="card shadow-lg border-0" style="max-width: 430px; width: 100%;">
+    <div class="card-header text-white text-center py-3 navbar-chino">
+        <h4 class="mb-0 fw-bold">🚌 EMPRESA "EL CHINO"</h4>
+        <small>Sistema de Gestión de Mantenimiento y Control de Flota</small>
+    </div>
+    <div class="card-body p-4">
+        <div th:if="${param.error}" class="alert alert-danger small">
+            Credenciales inválidas o cuenta bloqueada temporalmente (máx. 3 intentos fallidos - CUS01).
+        </div>
+        <div th:if="${param.logout}" class="alert alert-info small">
+            Sesión cerrada correctamente.
+        </div>
+        <form th:action="@{/login}" method="post">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Usuario</label>
+                <input type="text" name="username" class="form-control" placeholder="Ej: admin, jefe.taller, tecnico1, conductor1" required autofocus>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Contraseña</label>
+                <input type="password" name="password" class="form-control" placeholder="Contraseña" required>
+            </div>
+            <button type="submit" class="btn btn-success w-100 fw-bold">Ingresar al Sistema</button>
+        </form>
+        <hr>
+        <div class="small text-muted">
+            <strong>Usuarios de prueba (Clave: <code>admin123</code>):</strong><br>
+            • <code>admin</code> (ADMINISTRADOR)<br>
+            • <code>jefe.taller</code> (RESPONSABLE_MANTENIMIENTO)<br>
+            • <code>tecnico1</code> (TECNICO)<br>
+            • <code>operaciones</code> (OPERACIONES)<br>
+            • <code>conductor1</code> (CONDUCTOR)
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Ejecución de Reparaciones')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <h3 class="fw-bold mb-3">🔧 Ejecución Transaccional de Reparaciones y Repuestos (CUS07 / CUS08 / CUS09)</h3>
+    <div class="row g-4">
+        <div class="col-md-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white fw-bold">Registrar Reparación y Descuento de Stock</div>
+                <div class="card-body">
+                    <form th:action="@{/reparaciones/guardar}" method="post">
+                        <div class="mb-2">
+                            <label class="form-label">Orden de Mantenimiento Activa</label>
+                            <select name="idMantenimiento" class="form-select" required>
+                                <option th:each="m : ${mantenimientosActivos}" th:value="${m.idMantenimiento}"
+                                        th:selected="${reparacionDTO.idMantenimiento == m.idMantenimiento}"
+                                        th:text="'#' + ${m.idMantenimiento} + ' - ' + ${m.unidadDescripcion} + ' (' + ${m.tipoMantenimiento} + ')'"></option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Diagnóstico Técnico</label>
+                            <textarea name="diagnosticoTecnico" class="form-control" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Acciones Realizadas</label>
+                            <textarea name="accionesRealizadas" class="form-control" rows="2" required></textarea>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col">
+                                <label class="form-label">Horas-Hombre</label>
+                                <input type="number" step="0.5" name="horasHombre" class="form-control" value="2.0" required>
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Costo Mano Obra (S/)</label>
+                                <input type="number" step="0.01" name="costoManoObra" class="form-control" value="120.00" required>
+                            </div>
+                        </div>
+
+                        <!-- Selector dinámico de repuestos (CUS08) -->
+                        <div class="border rounded p-2 mb-2 bg-light">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong class="small">Repuestos Consumidos (Descuento Atómico)</strong>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="agregarFilaRepuesto()">+ Añadir Repuesto</button>
+                            </div>
+                            <div id="contenedorRepuestos"></div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Resultado de Verificación (CUS09)</label>
+                            <select name="resultado" class="form-select">
+                                <option value="SATISFACTORIO">SATISFACTORIO (Finaliza y pasa Unidad a OPERATIVA)</option>
+                                <option value="REQUIERE_REVISION">REQUIERE_REVISION (Mantiene EN_PROCESO)</option>
+                                <option value="PENDIENTE">PENDIENTE</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Observaciones de Verificación</label>
+                            <input type="text" name="observacionesVerificacion" class="form-control" placeholder="Prueba de ruta conforme">
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-bold">Registrar Reparación (Transaccional)</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Historial de Reparaciones Ejecutadas</div>
+                <div class="card-body table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Unidad</th>
+                            <th>Diagnóstico / Acciones</th>
+                            <th>Repuestos Usados</th>
+                            <th>Resultado</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="r : ${reparaciones}">
+                            <td th:text="${r.idReparacion}">1</td>
+                            <td class="fw-bold" th:text="${r.unidadDescripcion}">CH-102</td>
+                            <td>
+                                <strong th:text="${r.diagnosticoTecnico}">Diag</strong><br>
+                                <small th:text="${r.accionesRealizadas}">Acción</small>
+                            </td>
+                            <td>
+                                <ul class="list-unstyled mb-0 small">
+                                    <li th:each="d : ${r.detallesRepuestos}"
+                                        th:text="${d.cantidad} + 'x ' + ${d.repuestoNombre} + ' (S/ ' + ${d.subtotal} + ')'"></li>
+                                </ul>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${r.resultado == 'SATISFACTORIO'} ? 'bg-success' : 'bg-warning text-dark'"
+                                      th:text="${r.resultado}">SATISFACTORIO</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="plantillaFilaRepuesto">
+    <div class="row g-1 mb-1 fila-repuesto align-items-center">
+        <div class="col-8">
+            <select name="idRepuesto" class="form-select form-select-sm" required>
+                <option th:each="rep : ${catalogoRepuestos}" th:value="${rep.idRepuesto}"
+                        th:text="${rep.codigoSku} + ' - ' + ${rep.nombre} + ' (Stock: ' + ${rep.stock} + ')'"></option>
+            </select>
+        </div>
+        <div class="col-3">
+            <input type="number" name="cantidadRepuesto" class="form-control form-control-sm" min="1" value="1" required>
+        </div>
+        <div class="col-1 text-end">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="eliminarFilaRepuesto(this)">&times;</button>
+        </div>
+    </div>
+</template>
+
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

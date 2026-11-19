@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Historial de Mantenimiento')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div th:replace="~{fragments/layout :: alertas}"></div>
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="fw-bold mb-0">📜 Línea de Tiempo e Historial por Unidad (CUS10 / QA-05)</h3>
+        <form th:action="@{/historial}" method="get" class="d-flex gap-2">
+            <select name="idUnidad" class="form-select form-select-sm">
+                <option value="">-- Todas las Unidades --</option>
+                <option th:each="u : ${unidades}" th:value="${u.idUnidad}"
+                        th:selected="${idUnidadSeleccionada == u.idUnidad}"
+                        th:text="${u.codigoInterno} + ' (' + ${u.placa} + ')'"></option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-success">Filtrar</button>
+        </form>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div th:each="ev : ${eventos}" class="timeline-item">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <span class="badge bg-dark me-2" th:text="${ev.unidadDescripcion}">CH-102</span>
+                        <strong th:text="${ev.tipoEvento}">EVENTO</strong>
+                        <span class="ms-2 small text-muted">
+                            (<span th:text="${ev.estadoAnteriorUnidad ?: 'N/A'}"></span> &rarr;
+                            <strong class="text-success" th:text="${ev.estadoNuevoUnidad}"></strong>)
+                        </span>
+                    </div>
+                    <small class="text-muted" th:text="${#temporals.format(ev.fechaEvento, 'dd/MM/yyyy HH:mm')} + ' | Por: ' + ${ev.usuarioNombre}"></small>
+                </div>
+                <p class="mb-0 mt-1 small" th:text="${ev.descripcionEvento}"></p>
+            </div>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>

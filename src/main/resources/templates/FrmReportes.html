@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Reportes Gerenciales')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="fw-bold mb-0">📊 Reporte Gerencial de Flota y Mantenimiento (CUS11 / CUS12)</h3>
+            <small class="text-muted">Empresa de Transporte Urbano "El Chino" - Lima, Perú</small>
+        </div>
+        <button onclick="window.print()" class="btn btn-primary no-print">🖨️ Imprimir / Exportar PDF</button>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <small class="text-muted">Disponibilidad Operativa</small>
+                    <h3 class="fw-bold text-success" th:text="${resumen.disponibilidadFlotaPorcentaje} + '%'">0%</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <small class="text-muted">Mantenimientos Finalizados</small>
+                    <h3 class="fw-bold" th:text="${resumen.mantenimientosFinalizados}">0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <small class="text-muted">Mantenimientos Pendientes</small>
+                    <h3 class="fw-bold text-warning" th:text="${resumen.mantenimientosPendientes}">0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <small class="text-muted">Inversión Total Mantenimiento</small>
+                    <h3 class="fw-bold text-primary" th:text="'S/ ' + ${resumen.costoTotalMantenimiento}">S/ 0.00</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white fw-bold">Estado General de Unidades de Transporte</div>
+        <div class="card-body table-responsive">
+            <table class="table table-sm table-bordered align-middle">
+                <thead class="table-light">
+                <tr>
+                    <th>Código</th>
+                    <th>Placa</th>
+                    <th>Marca y Modelo</th>
+                    <th>Año</th>
+                    <th>Kilometraje</th>
+                    <th>Estado Actual</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="u : ${unidades}">
+                    <td class="fw-bold" th:text="${u.codigoInterno}">CH-101</td>
+                    <td th:text="${u.placa}">Placa</td>
+                    <td th:text="${u.marca} + ' ' + ${u.modelo}">Modelo</td>
+                    <td th:text="${u.anioFabricacion}">2021</td>
+                    <td th:text="${u.kilometrajeActual} + ' km'">0 km</td>
+                    <td th:text="${u.estado}">OPERATIVA</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<footer th:replace="~{fragments/layout :: scripts}"></footer>
+</body>
+</html>
