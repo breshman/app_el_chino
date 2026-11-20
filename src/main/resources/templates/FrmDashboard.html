@@ -2,121 +2,180 @@
 <html lang="es" xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Dashboard Operativo')}"></head>
-<body>
+<body class="bg-light">
 <nav th:replace="~{fragments/layout :: navbar}"></nav>
 <div th:replace="~{fragments/layout :: alertas}"></div>
 
-<div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <h3 class="fw-bold mb-0">Panel de Control de Flota "El Chino"</h3>
-        <div>
-            <a th:href="@{/fallas}" class="btn btn-danger btn-sm me-2">+ Reportar Falla Rápida (CUS05)</a>
-            <a th:href="@{/mantenimientos/programar}" sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO')"
-               class="btn btn-success btn-sm">+ Programar Mantenimiento (CUS06)</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a th:href="@{/inspecciones}" class="btn btn-outline-primary btn-sm">📋 Nueva Inspección</a>
+            <a th:href="@{/fallas}" class="btn btn-danger btn-sm">🚨 Reportar Falla</a>
+            <a th:href="@{/mantenimientos/programar}"
+               sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO')"
+               class="btn btn-success btn-sm">📅 Programar Mantenimiento</a>
         </div>
     </div>
 
     <!-- Tarjetas KPI -->
     <div class="row g-3 mb-4">
         <div class="col-md-3">
-            <div class="card card-kpi shadow-sm">
-                <div class="card-body">
-                    <h6 class="text-muted">Unidades Operativas</h6>
-                    <h2 class="fw-bold text-success" th:text="${resumen.unidadesOperativas} + ' / ' + ${resumen.totalUnidades}">0</h2>
-                    <small th:text="'Disponibilidad: ' + ${resumen.disponibilidadFlotaPorcentaje} + '%'">100%</small>
+            <a th:href="@{/unidades(estado='OPERATIVA')}" class="text-decoration-none">
+                <div class="card card-kpi border-0 border-start border-success border-4 shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">Unidades Operativas</h6>
+                        <h2 class="fw-bold text-success mb-1"
+                            th:text="${resumen.unidadesOperativas} + ' / ' + ${resumen.totalUnidades}">0 / 0</h2>
+                        <div class="progress mb-1" style="height: 6px;">
+                            <div class="progress-bar bg-success" role="progressbar"
+                                 th:style="'width: ' + ${resumen.disponibilidadFlotaPorcentaje} + '%'"></div>
+                        </div>
+                        <small class="text-muted"
+                               th:text="'Disponibilidad: ' + ${resumen.disponibilidadFlotaPorcentaje} + '%'">100%</small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
+
         <div class="col-md-3">
-            <div class="card card-kpi shadow-sm">
-                <div class="card-body">
-                    <h6 class="text-muted">En Mantenimiento / Fuera Servicio</h6>
-                    <h2 class="fw-bold text-warning" th:text="${resumen.unidadesEnMantenimiento} + ' / ' + ${resumen.unidadesFueraDeServicio}">0</h2>
-                    <small>Unidades en taller</small>
+            <a th:href="@{/unidades(estado='EN_MANTENIMIENTO')}" class="text-decoration-none">
+                <div class="card card-kpi border-0 border-start border-warning border-4 shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">En Taller / Fuera Servicio</h6>
+                        <h2 class="fw-bold text-warning mb-1"
+                            th:text="${resumen.unidadesEnMantenimiento} + ' / ' + ${resumen.unidadesFueraDeServicio}">0 / 0</h2>
+                        <small class="text-muted">Unidades detenidas</small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
+
         <div class="col-md-3">
-            <div class="card card-kpi shadow-sm">
-                <div class="card-body">
-                    <h6 class="text-muted">Fallas Activas (Críticas/Altas)</h6>
-                    <h2 class="fw-bold text-danger" th:text="${resumen.fallasActivas} + ' (' + ${resumen.fallasCriticasOAltas} + ')'">0</h2>
-                    <small>Pendientes de solución</small>
+            <a th:href="@{/fallas}" class="text-decoration-none">
+                <div class="card card-kpi border-0 border-start border-danger border-4 shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">Fallas Activas (Críticas/Altas)</h6>
+                        <h2 class="fw-bold text-danger mb-1"
+                            th:text="${resumen.fallasActivas} + ' (' + ${resumen.fallasCriticasOAltas} + ')'">0 (0)</h2>
+                        <small class="text-muted">Pendientes de solución</small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
+
         <div class="col-md-3">
-            <div class="card card-kpi shadow-sm">
-                <div class="card-body">
-                    <h6 class="text-muted">Alertas Bajo Stock (CUS08)</h6>
-                    <h2 class="fw-bold text-primary" th:text="${resumen.repuestosBajoStock}">0</h2>
-                    <small>Repuestos con stock &le; mínimo</small>
+            <a th:href="@{/repuestos}" class="text-decoration-none">
+                <div class="card card-kpi border-0 border-start border-primary border-4 shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">Alertas Bajo Stock</h6>
+                        <h2 class="fw-bold text-primary mb-1" th:text="${resumen.repuestosBajoStock}">0</h2>
+                        <small class="text-muted">Stock &le; mínimo</small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 
     <div class="row g-4">
-        <!-- Tablero de Mantenimientos Pendientes (CUS11) -->
+        <!-- Tablero de Mantenimientos Pendientes -->
         <div class="col-lg-7">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold">🛠️ Mantenimientos Programados y En Proceso (CUS11)</div>
-                <div class="card-body table-responsive">
-                    <table class="table table-sm table-hover align-middle">
-                        <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Unidad</th>
-                            <th>Tipo</th>
-                            <th>Técnico</th>
-                            <th>Fecha Prog.</th>
-                            <th>Estado</th>
-                            <th>Acción</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="m : ${mantenimientosPendientes}">
-                            <td th:text="${m.idMantenimiento}">1</td>
-                            <td class="fw-semibold" th:text="${m.unidadDescripcion}">CH-102</td>
-                            <td th:text="${m.tipoMantenimiento}">CORRECTIVO</td>
-                            <td th:text="${m.tecnicoNombre}">Técnico</td>
-                            <td th:text="${#temporals.format(m.fechaProgramada, 'dd/MM/yyyy HH:mm')}">Fecha</td>
-                            <td><span class="badge bg-warning text-dark" th:text="${m.estado}">PROGRAMADO</span></td>
-                            <td>
-                                <a th:href="@{/reparaciones(idMantenimiento=${m.idMantenimiento})}"
-                                   sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO','TECNICO')"
-                                   class="btn btn-sm btn-outline-success">Ejecutar</a>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <span class="fw-bold">🛠️ Órdenes de Mantenimiento Activas</span>
+                    <a th:href="@{/mantenimientos}" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${#lists.isEmpty(mantenimientosPendientes)}" class="text-center py-5 text-muted">
+                        <p class="mb-0 fw-semibold">No hay mantenimientos pendientes</p>
+                    </div>
+
+                    <div class="table-responsive" th:unless="${#lists.isEmpty(mantenimientosPendientes)}">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Unidad</th>
+                                <th>Tipo</th>
+                                <th>Técnico</th>
+                                <th>Fecha Prog.</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acción</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="m : ${mantenimientosPendientes}">
+                                <td class="text-muted" th:text="${m.idMantenimiento}">1</td>
+                                <td class="fw-semibold" th:text="${m.unidadDescripcion}">CH-102</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${m.tipoMantenimiento == 'CORRECTIVO'} ? 'bg-danger-subtle text-danger' : 'bg-info-subtle text-dark'"
+                                          th:text="${m.tipoMantenimiento}">CORRECTIVO</span>
+                                </td>
+                                <td th:text="${m.tecnicoNombre}">Técnico</td>
+                                <td th:text="${#temporals.format(m.fechaProgramada, 'dd/MM/yyyy HH:mm')}">Fecha</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${m.estado == 'EN_PROCESO'} ? 'bg-primary' : 'bg-warning text-dark'"
+                                          th:text="${m.estado}">PROGRAMADO</span>
+                                </td>
+                                <td class="text-end">
+                                    <form th:if="${m.estado == 'PROGRAMADO'}"
+                                          sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO','TECNICO')"
+                                          th:action="@{/mantenimientos/{id}/iniciar(id=${m.idMantenimiento})}"
+                                          method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-primary text-nowrap">▶ Iniciar</button>
+                                    </form>
+
+                                    <a th:if="${m.estado == 'EN_PROCESO'}"
+                                       th:href="@{/reparaciones(idMantenimiento=${m.idMantenimiento})}"
+                                       sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO','TECNICO')"
+                                       class="btn btn-sm btn-success text-nowrap">✔ Reparar</a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Alertas de Repuestos Bajo Stock (CUS08) -->
+        <!-- Alertas de Repuestos Bajo Stock -->
         <div class="col-lg-5">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold text-danger">⚠️ Alertas de Stock Mínimo en Almacén (CUS08)</div>
-                <div class="card-body table-responsive">
-                    <table class="table table-sm align-middle">
-                        <thead class="table-light">
-                        <tr>
-                            <th>SKU</th>
-                            <th>Repuesto</th>
-                            <th>Stock</th>
-                            <th>Mínimo</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="r : ${alertasStock}">
-                            <td th:text="${r.codigoSku}">SKU</td>
-                            <td th:text="${r.nombre}">Nombre</td>
-                            <td><span class="badge bg-danger" th:text="${r.stock}">0</span></td>
-                            <td th:text="${r.stockMinimo}">5</td>
-                        </tr>
-                        </tbody>
-                    </table>
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <span class="fw-bold text-danger">⚠️ Alertas de Stock Mínimo en Almacén</span>
+                    <a th:href="@{/repuestos}" class="btn btn-sm btn-outline-danger">Ir a Almacén</a>
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${#lists.isEmpty(alertasStock)}" class="text-center py-5 text-muted">
+                        <p class="mb-0 fw-semibold text-success">Inventario sin alertas</p>
+                    </div>
+
+                    <div class="table-responsive" th:unless="${#lists.isEmpty(alertasStock)}">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>SKU</th>
+                                <th>Repuesto</th>
+                                <th class="text-center">Stock</th>
+                                <th class="text-center">Mínimo</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="r : ${alertasStock}">
+                                <td class="small fw-semibold" th:text="${r.codigoSku}">SKU</td>
+                                <td th:text="${r.nombre}">Nombre</td>
+                                <td class="text-center">
+                                    <span class="badge"
+                                          th:classappend="${r.stock == 0} ? 'bg-dark' : 'bg-danger'"
+                                          th:text="${r.stock == 0} ? 'AGOTADO (0)' : ${r.stock}">0</span>
+                                </td>
+                                <td class="text-center text-muted" th:text="${r.stockMinimo}">5</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

@@ -15,31 +15,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Implementación de la capa de servicio para la gestión de unidades de transporte
  * de la flota "El Chino" (Implementa CUS02, CUS03, CUS10 y QA-05).
- *
- * <p>Garantiza que todo cambio de estado de una unidad genere automáticamente un
- * registro inmutable en {@code historial_mantenimiento}.</p>
- *
- * @author Desarrollador Backend Core (@BackendAgent)
- * @version 1.0.0
  */
 @Service
 public class UnidadServiceImpl implements IUnidadService {
+
+    private static final Set<String> ESTADOS_VALIDOS = Set.of("OPERATIVA", "EN_MANTENIMIENTO", "FUERA_DE_SERVICIO");
 
     private final IUnidadDAO unidadDAO;
     private final IUsuarioDAO usuarioDAO;
     private final IHistorialMantenimientoDAO historialDAO;
 
-    /**
-     * Constructor con inyección de DAOs requeridos.
-     *
-     * @param unidadDAO    DAO de unidades.
-     * @param usuarioDAO   DAO de usuarios.
-     * @param historialDAO DAO de historial de mantenimiento.
-     */
     public UnidadServiceImpl(IUnidadDAO unidadDAO,
                              IUsuarioDAO usuarioDAO,
                              IHistorialMantenimientoDAO historialDAO) {
@@ -48,56 +38,50 @@ public class UnidadServiceImpl implements IUnidadService {
         this.historialDAO = historialDAO;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<Unidad> listarTodas() {
         return unidadDAO.listarTodas();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<Unidad> listarPorEstado(String estado) {
         return unidadDAO.listarPorEstado(estado);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Unidad obtenerPorId(Integer idUnidad) {
         return unidadDAO.buscarPorId(idUnidad)
                 .orElseThrow(() -> new ResourceNotFoundException("No se encontró la unidad con ID: " + idUnidad));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public Unidad registrarUnidad(UnidadDTO dto, String usernameEjecutor) {
-        Optional<Unidad> existente = unidadDAO.buscarPorCodigoOPlaca(dto.getCodigoInterno(), dto.getPlaca());
+        String codigo = dto.getCodigoInterno().trim().toUpperCase();
+        String placa = dto.getPlaca().trim().toUpperCase();
+
+        Optional<Unidad> existente = unidadDAO.buscarPorCodigoOPlaca(codigo, placa);
         if (existente.isPresent()) {
             throw new BusinessException("Ya existe una unidad registrada con el código '" +
-                    dto.getCodigoInterno() + "' o placa '" + dto.getPlaca() + "'.");
+                    codigo + "' o placa '" + placa + "'.");
         }
 
+        String estadoInicial = (dto.getEstado() != null && !dto.getEstado().isBlank())
+                ? dto.getEstado().trim().toUpperCase()
+                : "OPERATIVA";
+        validarEstadoUnidad(estadoInicial);
+
         Unidad unidad = new Unidad();
-        unidad.setCodigoInterno(dto.getCodigoInterno().trim().toUpperCase());
-        unidad.setPlaca(dto.getPlaca().trim().toUpperCase());
+        unidad.setCodigoInterno(codigo);
+        unidad.setPlaca(placa);
         unidad.setMarca(dto.getMarca().trim());
         unidad.setModelo(dto.getModelo().trim());
         unidad.setAnioFabricacion(dto.getAnioFabricacion());
         unidad.setKilometrajeActual(dto.getKilometrajeActual());
-        String estadoInicial = dto.getEstado() != null ? dto.getEstado() : "OPERATIVA";
         unidad.setEstado(estadoInicial);
 
         Unidad guardada = unidadDAO.insertar(unidad);
 
-        // QA-05: Registrar alta inicial de la unidad en historial_mantenimiento
         registrarEventoHistorial(guardada.getIdUnidad(), null, usernameEjecutor,
                 "ALTA_UNIDAD", null, estadoInicial,
                 "Alta de unidad " + guardada.getCodigoInterno() + " (" + guardada.getPlaca() + ") en estado " + estadoInicial);
@@ -105,18 +89,34 @@ public class UnidadServiceImpl implements IUnidadService {
         return guardada;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public Unidad actualizarUnidad(Integer idUnidad, UnidadDTO dto, String usernameEjecutor) {
         Unidad actual = obtenerPorId(idUnidad);
         String estadoAnterior = actual.getEstado();
-        String estadoNuevo = dto.getEstado() != null ? dto.getEstado() : estadoAnterior;
 
-        actual.setCodigoInterno(dto.getCodigoInterno().trim().toUpperCase());
-        actual.setPlaca(dto.getPlaca().trim().toUpperCase());
+        String nuevoCodigo = dto.getCodigoInterno().trim().toUpperCase();
+        String nuevaPlaca = dto.getPlaca().trim().toUpperCase();
+
+        // Validar duplicados excluyendo la misma unidad que se está editando
+        Optional<Unidad> duplicada = unidadDAO.buscarPorCodigoOPlaca(nuevoCodigo, nuevaPlaca);
+        if (duplicada.isPresent() && !duplicada.get().getIdUnidad().equals(idUnidad)) {
+            throw new BusinessException("Ya existe otra unidad registrada con el código '" +
+                    nuevoCodigo + "' o placa '" + nuevaPlaca + "'.");
+        }
+
+        String estadoNuevo = (dto.getEstado() != null && !dto.getEstado().isBlank())
+                ? dto.getEstado().trim().toUpperCase()
+                : estadoAnterior;
+        validarEstadoUnidad(estadoNuevo);
+
+        if (dto.getKilometrajeActual() != null && dto.getKilometrajeActual() < actual.getKilometrajeActual()) {
+            throw new BusinessException("El kilometraje (" + dto.getKilometrajeActual() +
+                    " km) no puede ser menor al actual registrado (" + actual.getKilometrajeActual() + " km).");
+        }
+
+        actual.setCodigoInterno(nuevoCodigo);
+        actual.setPlaca(nuevaPlaca);
         actual.setMarca(dto.getMarca().trim());
         actual.setModelo(dto.getModelo().trim());
         actual.setAnioFabricacion(dto.getAnioFabricacion());
@@ -125,7 +125,6 @@ public class UnidadServiceImpl implements IUnidadService {
 
         unidadDAO.actualizar(actual);
 
-        // QA-05: Si hubo cambio de estado operativo, insertar automáticamente en historial_mantenimiento
         if (!estadoAnterior.equalsIgnoreCase(estadoNuevo)) {
             registrarEventoHistorial(idUnidad, null, usernameEjecutor,
                     "CAMBIO_ESTADO_MANUAL", estadoAnterior, estadoNuevo,
@@ -136,9 +135,6 @@ public class UnidadServiceImpl implements IUnidadService {
         return actual;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public void cambiarEstadoConAuditoria(Integer idUnidad,
@@ -146,18 +142,24 @@ public class UnidadServiceImpl implements IUnidadService {
                                           String motivo,
                                           Integer idMantenimiento,
                                           String usernameEjecutor) {
+        String estadoNormalizado = nuevoEstado != null ? nuevoEstado.trim().toUpperCase() : "";
+        validarEstadoUnidad(estadoNormalizado);
+
         Unidad actual = obtenerPorId(idUnidad);
         String estadoAnterior = actual.getEstado();
-        unidadDAO.actualizarEstado(idUnidad, nuevoEstado);
+        unidadDAO.actualizarEstado(idUnidad, estadoNormalizado);
 
-        // QA-05: Trazabilidad obligatoria en historial_mantenimiento
         registrarEventoHistorial(idUnidad, idMantenimiento, usernameEjecutor,
-                "CAMBIO_ESTADO", estadoAnterior, nuevoEstado, motivo);
+                "CAMBIO_ESTADO", estadoAnterior, estadoNormalizado, motivo);
     }
 
-    /**
-     * Método auxiliar interno para persistir un evento en {@code historial_mantenimiento}.
-     */
+    private void validarEstadoUnidad(String estado) {
+        if (!ESTADOS_VALIDOS.contains(estado)) {
+            throw new BusinessException("Estado de unidad no válido: '" + estado +
+                    "'. Valores permitidos: OPERATIVA, EN_MANTENIMIENTO, FUERA_DE_SERVICIO.");
+        }
+    }
+
     private void registrarEventoHistorial(Integer idUnidad,
                                           Integer idMantenimiento,
                                           String usernameEjecutor,
@@ -165,14 +167,17 @@ public class UnidadServiceImpl implements IUnidadService {
                                           String estadoAnterior,
                                           String estadoNuevo,
                                           String descripcion) {
-        Integer idUsuario = usuarioDAO.buscarPorUsername(usernameEjecutor != null ? usernameEjecutor : "admin")
-                .map(Usuario::getIdUsuario)
-                .orElse(1);
+        if (usernameEjecutor == null || usernameEjecutor.isBlank()) {
+            throw new BusinessException("No se pudo identificar al usuario ejecutor para registrar la auditoría.");
+        }
+
+        Usuario ejecutor = usuarioDAO.buscarPorUsername(usernameEjecutor)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario ejecutor no encontrado para auditoría: " + usernameEjecutor));
 
         HistorialMantenimiento h = new HistorialMantenimiento();
         h.setIdUnidad(idUnidad);
         h.setIdMantenimiento(idMantenimiento);
-        h.setIdUsuario(idUsuario);
+        h.setIdUsuario(ejecutor.getIdUsuario());
         h.setTipoEvento(tipoEvento);
         h.setEstadoAnteriorUnidad(estadoAnterior);
         h.setEstadoNuevoUnidad(estadoNuevo);

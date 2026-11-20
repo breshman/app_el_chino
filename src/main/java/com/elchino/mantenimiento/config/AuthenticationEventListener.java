@@ -2,6 +2,8 @@ package com.elchino.mantenimiento.config;
 
 import com.elchino.mantenimiento.dao.IUsuarioDAO;
 import com.elchino.mantenimiento.model.Usuario;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
@@ -10,71 +12,57 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-/**
- * Listener de eventos de autenticación de Spring Security para hacer cumplir
- * la regla crítica de seguridad CUS01 y RNF01:
- * <ul>
- *     <li>Incrementa el contador de intentos fallidos ante credenciales inválidas.</li>
- *     <li>Al alcanzar 3 intentos fallidos consecutivos, bloquea temporalmente la cuenta por 15 minutos.</li>
- *     <li>Al iniciar sesión exitosamente, restablece el contador de intentos fallidos a 0.</li>
- * </ul>
- *
- * @author Arquitecto de Software (@ArchitectAgent)
- * @version 1.0.0
- */
 @Component
 public class AuthenticationEventListener {
 
-    /**
-     * Límite máximo de intentos fallidos antes de bloquear la cuenta (CUS01).
-     */
-    public static final int MAX_INTENTOS_FALLIDOS = 3;
-
-    /**
-     * Duración del bloqueo temporal en minutos.
-     */
-    public static final int MINUTOS_BLOQUEO = 15;
+    private static final Logger log = LoggerFactory.getLogger(AuthenticationEventListener.class);
+    private static final int MAX_INTENTOS_FALLIDOS = 3;
+    private static final int MINUTOS_BLOQUEO = 15;
 
     private final IUsuarioDAO usuarioDAO;
 
-    /**
-     * Constructor con inyección de {@link IUsuarioDAO}.
-     *
-     * @param usuarioDAO DAO de usuarios.
-     */
     public AuthenticationEventListener(IUsuarioDAO usuarioDAO) {
         this.usuarioDAO = usuarioDAO;
     }
 
-    /**
-     * Intercepta los fallos de autenticación por contraseña incorrecta e incrementa
-     * el contador o bloquea la cuenta al tercer intento (CUS01).
-     *
-     * @param event evento de fallo de credenciales.
-     */
-    @EventListener
-    public void onAuthenticationFailure(AuthenticationFailureBadCredentialsEvent event) {
-        String username = event.getAuthentication().getName();
-        Optional<Usuario> opt = usuarioDAO.buscarPorUsername(username);
-        if (opt.isPresent()) {
-            Usuario u = opt.get();
-            int nuevosIntentos = (u.getIntentosFallidos() != null ? u.getIntentosFallidos() : 0) + 1;
-            LocalDateTime bloqueadoHasta = u.getBloqueadoHasta();
-            if (nuevosIntentos >= MAX_INTENTOS_FALLIDOS) {
-                bloqueadoHasta = LocalDateTime.now().plusMinutes(MINUTOS_BLOQUEO);
-            }
-            usuarioDAO.actualizarIntentosYBloqueo(username, nuevosIntentos, bloqueadoHasta);
-        }
-    }
-
-    /**
-     * Intercepta los inicios de sesión exitosos para limpiar el contador de intentos fallidos.
-     *
-     * @param event evento de autenticación exitosa.
-     */
     @EventListener
     public void onAuthenticationSuccess(AuthenticationSuccessEvent event) {
         String username = event.getAuthentication().getName();
-        usuarioDAO.actualizarIntentosYBloqueo(username, 0, null);
+        usuarioDAO.buscarPorUsername(username).ifPresent(usuario -> {
+            if ((usuario.getIntentosFallidos() != null && usuario.getIntentosFallidos() > 0)
+                    || usuario.getBloqueadoHasta() != null) {
+                usuarioDAO.actualizarIntentosYBloqueo(username, 0, null);
+            }
+        });
+    }
+
+    @EventListener
+    public void onAuthenticationFailure(AuthenticationFailureBadCredentialsEvent event) {
+        Object principal = event.getAuthentication().getPrincipal();
+        if (principal == null) {
+            return;
+        }
+
+        String username = principal.toString().trim();
+        Optional<Usuario> usuarioOpt = usuarioDAO.buscarPorUsername(username);
+
+        usuarioOpt.ifPresent(usuario -> {
+            // Si ya había expirado un bloqueo previo, reiniciamos el contador desde 0
+            int intentosPrevios = (usuario.getBloqueadoHasta() != null
+                    && usuario.getBloqueadoHasta().isBefore(LocalDateTime.now()))
+                    ? 0
+                    : (usuario.getIntentosFallidos() != null ? usuario.getIntentosFallidos() : 0);
+
+            int nuevosIntentos = intentosPrevios + 1;
+            LocalDateTime bloqueadoHasta = null;
+
+            if (nuevosIntentos >= MAX_INTENTOS_FALLIDOS) {
+                bloqueadoHasta = LocalDateTime.now().plusMinutes(MINUTOS_BLOQUEO);
+                log.warn("SEGURIDAD: Cuenta '{}' bloqueada por {} minutos tras {} intentos fallidos.",
+                        username, MINUTOS_BLOQUEO, nuevosIntentos);
+            }
+
+            usuarioDAO.actualizarIntentosYBloqueo(username, nuevosIntentos, bloqueadoHasta);
+        });
     }
 }

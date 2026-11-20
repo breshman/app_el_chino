@@ -11,14 +11,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Controlador de averias e incidencias mecanicas (CUS05).
@@ -30,67 +34,50 @@ public class CtrlFallas {
     private final IFallaService servicio;
     private final IUnidadService unidadServicio;
 
-    /**
-     * Constructor del controlador.
-     *
-     * @param servicio       servicio de fallas.
-     * @param unidadServicio servicio de unidades.
-     */
     public CtrlFallas(IFallaService servicio, IUnidadService unidadServicio) {
         this.servicio = servicio;
         this.unidadServicio = unidadServicio;
     }
 
-    /**
-     * Muestra la plantilla FrmFalla con preseleccion de unidad si viene de CUS04.
-     *
-     * @param idUnidad     unidad preseleccionada.
-     * @param idInspeccion inspeccion origen.
-     * @param model        modelo MVC.
-     * @return vista FrmFalla.
-     */
     @GetMapping("/fallas")
     public String vista(@RequestParam(value = "idUnidad", required = false) Integer idUnidad,
                         @RequestParam(value = "idInspeccion", required = false) Integer idInspeccion,
                         Model model) {
-        FallaDTO dto = new FallaDTO();
-        dto.setIdUnidad(idUnidad);
-        dto.setIdInspeccion(idInspeccion);
-        model.addAttribute("fallaDTO", dto);
+        if (!model.containsAttribute("fallaDTO")) {
+            FallaDTO dto = new FallaDTO();
+            dto.setIdUnidad(idUnidad);
+            dto.setIdInspeccion(idInspeccion);
+            model.addAttribute("fallaDTO", dto);
+        }
         model.addAttribute("fallas", servicio.listarTodas());
         model.addAttribute("unidades", unidadServicio.listarTodas());
         return "FrmFalla";
     }
 
-    /**
-     * Registra una falla desde el formulario web (CUS05).
-     *
-     * @param dto   datos de la averia.
-     * @param auth  sesion activa.
-     * @param flash atributos flash.
-     * @return redireccion a /fallas.
-     */
     @PostMapping("/fallas/guardar")
     public String guardarWeb(@Valid @ModelAttribute("fallaDTO") FallaDTO dto,
+                             BindingResult result,
                              Authentication auth,
-                             RedirectAttributes flash) {
-        String autor = auth != null ? auth.getName() : "conductor1";
+                             RedirectAttributes flash,
+                             Model model) {
+        String autor = obtenerUsuarioAutenticado(auth);
+
+        if (result.hasErrors()) {
+            String errores = result.getFieldErrors().stream()
+                    .map(FieldError::getDefaultMessage)
+                    .collect(Collectors.joining("; "));
+            model.addAttribute("errorMensaje", "Revisa los datos de la falla: " + errores);
+            model.addAttribute("fallas", servicio.listarTodas());
+            model.addAttribute("unidades", unidadServicio.listarTodas());
+            return "FrmFalla";
+        }
+
         Falla f = servicio.registrarFalla(dto, autor);
         flash.addFlashAttribute("exitoMensaje",
                 "Falla #" + f.getIdFalla() + " reportada con prioridad " + f.getPrioridad());
         return "redirect:/fallas";
     }
 
-    /**
-     * Cambia prioridad y estado de una falla desde la vista (CUS05).
-     *
-     * @param id        ID de falla.
-     * @param prioridad nueva prioridad.
-     * @param estado    nuevo estado.
-     * @param auth      sesion activa.
-     * @param flash     atributos flash.
-     * @return redireccion a /fallas.
-     */
     @PostMapping("/fallas/{id}/priorizar")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESPONSABLE_MANTENIMIENTO')")
     public String priorizarWeb(@PathVariable("id") Integer id,
@@ -98,17 +85,13 @@ public class CtrlFallas {
                                @RequestParam("estado") String estado,
                                Authentication auth,
                                RedirectAttributes flash) {
-        String autor = auth != null ? auth.getName() : "jefe.taller";
-        servicio.priorizarFalla(id, prioridad, estado, autor);
-        flash.addFlashAttribute("exitoMensaje", "Falla actualizada a prioridad " + prioridad);
+        String autor = obtenerUsuarioAutenticado(auth);
+        Falla actualizada = servicio.priorizarFalla(id, prioridad, estado, autor);
+        flash.addFlashAttribute("exitoMensaje",
+                "Falla #" + id + " actualizada a prioridad " + actualizada.getPrioridad() + " (" + actualizada.getEstado() + ")");
         return "redirect:/fallas";
     }
 
-    /**
-     * Endpoint REST para listar fallas (CUS05).
-     *
-     * @return lista JSON.
-     */
     @GetMapping("/api/v1/fallas")
     @ResponseBody
     @Operation(summary = "Listar fallas (CUS05)", description = "Retorna todas las averias.")
@@ -117,21 +100,21 @@ public class CtrlFallas {
         return ResponseEntity.ok(ApiResponseDTO.ok("Fallas consultadas", servicio.listarTodas()));
     }
 
-    /**
-     * Endpoint REST para reportar falla (CUS05).
-     *
-     * @param dto  datos de la falla.
-     * @param auth sesion activa.
-     * @return falla creada.
-     */
     @PostMapping("/api/v1/fallas")
     @ResponseBody
     @Operation(summary = "Reportar falla (CUS05)", description = "Registra averia y evalua prioridad alta/critica.")
     @ApiResponse(responseCode = "201", description = "Creada")
     public ResponseEntity<ApiResponseDTO<Falla>> crearRest(@Valid @RequestBody FallaDTO dto,
                                                            Authentication auth) {
-        String autor = auth != null ? auth.getName() : "conductor1";
+        String autor = obtenerUsuarioAutenticado(auth);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDTO.ok("Falla registrada", servicio.registrarFalla(dto, autor)));
+    }
+
+    private String obtenerUsuarioAutenticado(Authentication auth) {
+        if (auth == null || !auth.isAuthenticated() || auth.getName() == null) {
+            throw new AccessDeniedException("Debe iniciar sesión para ejecutar esta operación.");
+        }
+        return auth.getName();
     }
 }

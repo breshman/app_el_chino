@@ -4,6 +4,7 @@ import com.elchino.mantenimiento.dao.IInspeccionDAO;
 import com.elchino.mantenimiento.dao.IUnidadDAO;
 import com.elchino.mantenimiento.dao.IUsuarioDAO;
 import com.elchino.mantenimiento.dto.InspeccionDTO;
+import com.elchino.mantenimiento.exception.BusinessException;
 import com.elchino.mantenimiento.exception.ResourceNotFoundException;
 import com.elchino.mantenimiento.model.Inspeccion;
 import com.elchino.mantenimiento.model.Unidad;
@@ -13,28 +14,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Implementación de la capa de servicio para inspecciones técnicas de unidades.
  * Implementa CUS04 y la regla de encadenamiento automático CUS04 -> CUS05.
- *
- * @author Desarrollador Backend Core (@BackendAgent)
- * @version 1.0.0
  */
 @Service
 public class InspeccionServiceImpl implements IInspeccionService {
+
+    private static final Set<String> TIPOS_VALIDOS = Set.of("PREVENTIVA", "RUTINARIA", "EXTRAORDINARIA");
+    private static final Set<String> RESULTADOS_VALIDOS = Set.of("CONFORME", "CON_OBSERVACIONES", "NO_CONFORME");
 
     private final IInspeccionDAO inspeccionDAO;
     private final IUnidadDAO unidadDAO;
     private final IUsuarioDAO usuarioDAO;
 
-    /**
-     * Constructor con inyección de DAOs.
-     *
-     * @param inspeccionDAO DAO de inspecciones.
-     * @param unidadDAO     DAO de unidades.
-     * @param usuarioDAO    DAO de usuarios.
-     */
     public InspeccionServiceImpl(IInspeccionDAO inspeccionDAO,
                                  IUnidadDAO unidadDAO,
                                  IUsuarioDAO usuarioDAO) {
@@ -43,34 +38,22 @@ public class InspeccionServiceImpl implements IInspeccionService {
         this.usuarioDAO = usuarioDAO;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<Inspeccion> listarTodas() {
         return inspeccionDAO.listarTodas();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<Inspeccion> listarPorUnidad(Integer idUnidad) {
         return inspeccionDAO.listarPorUnidad(idUnidad);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Inspeccion obtenerPorId(Integer idInspeccion) {
         return inspeccionDAO.buscarPorId(idInspeccion)
                 .orElseThrow(() -> new ResourceNotFoundException("No existe la inspección con ID: " + idInspeccion));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public Inspeccion registrarInspeccion(InspeccionDTO dto, String usernameInspector) {
@@ -80,30 +63,48 @@ public class InspeccionServiceImpl implements IInspeccionService {
         Usuario inspector = usuarioDAO.buscarPorUsername(usernameInspector)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario inspector no encontrado: " + usernameInspector));
 
+        // Regla de integridad de odómetro: el kilometraje no puede retroceder
+        Integer kmActual = unidad.getKilometrajeActual() != null ? unidad.getKilometrajeActual() : 0;
+        if (dto.getKilometrajeRegistrado() == null || dto.getKilometrajeRegistrado() < kmActual) {
+            throw new BusinessException("El kilometraje registrado (" + dto.getKilometrajeRegistrado() +
+                    " km) no puede ser menor al odómetro actual de la unidad " +
+                    unidad.getCodigoInterno() + " (" + kmActual + " km).");
+        }
+
+        String tipoNormalizado = dto.getTipoInspeccion() != null
+                ? dto.getTipoInspeccion().trim().toUpperCase()
+                : "RUTINARIA";
+        if (!TIPOS_VALIDOS.contains(tipoNormalizado)) {
+            throw new BusinessException("Tipo de inspección no válido: " + tipoNormalizado);
+        }
+
+        String resultadoNormalizado = dto.getResultado() != null
+                ? dto.getResultado().trim().toUpperCase()
+                : "";
+        if (!RESULTADOS_VALIDOS.contains(resultadoNormalizado)) {
+            throw new BusinessException("Resultado de inspección no válido: " + resultadoNormalizado);
+        }
+
         Inspeccion inspeccion = new Inspeccion();
         inspeccion.setIdUnidad(unidad.getIdUnidad());
         inspeccion.setIdInspector(inspector.getIdUsuario());
-        inspeccion.setTipoInspeccion(dto.getTipoInspeccion());
+        inspeccion.setTipoInspeccion(tipoNormalizado);
         inspeccion.setKilometrajeRegistrado(dto.getKilometrajeRegistrado());
-        inspeccion.setObservaciones(dto.getObservaciones());
-        inspeccion.setResultado(dto.getResultado());
+        inspeccion.setObservaciones(dto.getObservaciones() != null ? dto.getObservaciones().trim() : null);
+        inspeccion.setResultado(resultadoNormalizado);
 
         Inspeccion guardada = inspeccionDAO.insertar(inspeccion);
 
         // Actualiza el odómetro de la unidad si la inspección reporta un kilometraje superior
-        if (dto.getKilometrajeRegistrado() > unidad.getKilometrajeActual()) {
+        if (dto.getKilometrajeRegistrado() > kmActual) {
             unidadDAO.actualizarKilometraje(unidad.getIdUnidad(), dto.getKilometrajeRegistrado());
         }
 
         return guardada;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean requiereRegistroFalla(String resultado) {
-        // Regla CUS04 -> CUS05: Si el resultado es NO_CONFORME o CON_OBSERVACIONES, encadenar al registro de falla
         return "NO_CONFORME".equalsIgnoreCase(resultado) || "CON_OBSERVACIONES".equalsIgnoreCase(resultado);
     }
 }

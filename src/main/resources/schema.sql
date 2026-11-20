@@ -73,10 +73,10 @@ CREATE TABLE IF NOT EXISTS mantenimiento (
     estado VARCHAR(20) NOT NULL DEFAULT 'PROGRAMADO' CHECK (estado IN ('PROGRAMADO', 'EN_PROCESO', 'FINALIZADO', 'CANCELADO'))
 );
 
--- 6. TABLA: reparacion
+-- 6. TABLA: reparacion (Se elimina UNIQUE en id_mantenimiento para permitir segundas intervenciones tras REQUIERE_REVISION)
 CREATE TABLE IF NOT EXISTS reparacion (
     id_reparacion SERIAL PRIMARY KEY,
-    id_mantenimiento INTEGER NOT NULL UNIQUE REFERENCES mantenimiento(id_mantenimiento) ON DELETE RESTRICT,
+    id_mantenimiento INTEGER NOT NULL REFERENCES mantenimiento(id_mantenimiento) ON DELETE RESTRICT,
     id_tecnico INTEGER NOT NULL REFERENCES usuario(id_usuario) ON DELETE RESTRICT,
     diagnostico_tecnico TEXT NOT NULL,
     acciones_realizadas TEXT NOT NULL,
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS historial_mantenimiento (
 );
 
 -- =============================================================================
--- CREACIÓN DE LOS 8 ÍNDICES DE RENDIMIENTO (QA-02)
+-- ÍNDICES DE RENDIMIENTO
 -- =============================================================================
 CREATE INDEX IF NOT EXISTS idx_unidad_estado ON unidad(estado);
 CREATE INDEX IF NOT EXISTS idx_inspeccion_unidad_fecha ON inspeccion(id_unidad, fecha_inspeccion DESC);
@@ -132,5 +132,6 @@ CREATE INDEX IF NOT EXISTS idx_falla_unidad_estado ON falla(id_unidad, estado);
 CREATE INDEX IF NOT EXISTS idx_falla_prioridad ON falla(prioridad);
 CREATE INDEX IF NOT EXISTS idx_mantenimiento_tecnico_fecha ON mantenimiento(id_tecnico, fecha_programada);
 CREATE INDEX IF NOT EXISTS idx_mantenimiento_unidad_estado ON mantenimiento(id_unidad, estado);
+CREATE INDEX IF NOT EXISTS idx_reparacion_mantenimiento ON reparacion(id_mantenimiento);
 CREATE INDEX IF NOT EXISTS idx_repuesto_stock ON repuesto(stock, stock_minimo);
 CREATE INDEX IF NOT EXISTS idx_historial_unidad_fecha ON historial_mantenimiento(id_unidad, fecha_evento DESC);

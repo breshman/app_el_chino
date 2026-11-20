@@ -1,93 +1,162 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Inspecciones Técnicas')}"></head>
-<body>
+<body class="bg-light">
 <nav th:replace="~{fragments/layout :: navbar}"></nav>
 <div th:replace="~{fragments/layout :: alertas}"></div>
 
-<div class="container-fluid px-4">
-    <h3 class="fw-bold mb-3">🔍 Inspecciones Técnicas de Unidades (CUS04)</h3>
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h3 class="fw-bold mb-0">🔍 Inspecciones Técnicas de Unidades</h3>
+        <a th:href="@{/unidades}" class="btn btn-outline-secondary btn-sm">Ver Flota de Buses &rarr;</a>
+    </div>
+
     <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-success text-white fw-bold">Nueva Inspección Técnica</div>
+        <!-- Formulario de Nueva Inspección -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white fw-bold py-3">
+                    📋 Nueva Inspección Técnica
+                </div>
                 <div class="card-body">
                     <form th:action="@{/inspecciones/guardar}" th:object="${inspeccionDTO}" method="post">
-                        <div class="mb-2">
-                            <label class="form-label">Unidad</label>
-                            <select th:field="*{idUnidad}" class="form-select" required>
-                                <option th:each="u : ${unidades}" th:value="${u.idUnidad}"
-                                        th:text="${u.codigoInterno} + ' - ' + ${u.placa}"></option>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">1. Unidad a Inspeccionar *</label>
+                            <select id="selectUnidadInspeccion" th:field="*{idUnidad}" class="form-select" required>
+                                <option value="" data-km="0">-- Selecciona un bus --</option>
+                                <option th:each="u : ${unidades}"
+                                        th:value="${u.idUnidad}"
+                                        th:attr="data-km=${u.kilometrajeActual}"
+                                        th:text="${u.codigoInterno} + ' - ' + ${u.placa} + ' (' + ${u.estado} + ')'">
+                                </option>
                             </select>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label">Tipo de Inspección</label>
-                            <select th:field="*{tipoInspeccion}" class="form-select">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">2. Tipo de Inspección *</label>
+                            <select th:field="*{tipoInspeccion}" class="form-select" required>
                                 <option value="RUTINARIA">RUTINARIA</option>
                                 <option value="PREVENTIVA">PREVENTIVA</option>
                                 <option value="EXTRAORDINARIA">EXTRAORDINARIA</option>
                             </select>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label">Kilometraje Registrado</label>
-                            <input type="number" th:field="*{kilometrajeRegistrado}" class="form-control" required>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">3. Kilometraje Registrado (km) *</label>
+                            <input type="number" id="inputKilometraje" th:field="*{kilometrajeRegistrado}"
+                                   min="0" class="form-control" placeholder="Ej. 145200" required>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label">Resultado (CUS04 &rarr; CUS05)</label>
-                            <select th:field="*{resultado}" class="form-select">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">4. Resultado *</label>
+                            <select th:field="*{resultado}" class="form-select" required>
                                 <option value="CONFORME">CONFORME</option>
-                                <option value="CON_OBSERVACIONES">CON_OBSERVACIONES (Encadena a Falla)</option>
-                                <option value="NO_CONFORME">NO_CONFORME (Encadena a Falla)</option>
+                                <option value="CON_OBSERVACIONES">CON_OBSERVACIONES</option>
+                                <option value="NO_CONFORME">NO_CONFORME</option>
                             </select>
                         </div>
+
                         <div class="mb-3">
-                            <label class="form-label">Observaciones Técnicas</label>
-                            <textarea th:field="*{observaciones}" class="form-control" rows="3" required></textarea>
+                            <label class="form-label fw-semibold">5. Observaciones Técnicas *</label>
+                            <textarea th:field="*{observaciones}" class="form-control" rows="3" required
+                                      placeholder="Detalle de frenos, luces, neumáticos, motor..."></textarea>
                         </div>
-                        <button type="submit" class="btn btn-success w-100">Registrar Inspección</button>
+
+                        <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                            ✔ Registrar Inspección
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold">Bitácora de Inspecciones</div>
-                <div class="card-body table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Unidad</th>
-                            <th>Tipo</th>
-                            <th>Km</th>
-                            <th>Inspector</th>
-                            <th>Fecha</th>
-                            <th>Resultado</th>
-                            <th>Observaciones</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="i : ${inspecciones}">
-                            <td th:text="${i.idInspeccion}">1</td>
-                            <td class="fw-bold" th:text="${i.unidadDescripcion}">CH-102</td>
-                            <td th:text="${i.tipoInspeccion}">RUTINARIA</td>
-                            <td th:text="${i.kilometrajeRegistrado}">100000</td>
-                            <td th:text="${i.inspectorNombre}">Inspector</td>
-                            <td th:text="${#temporals.format(i.fechaInspeccion, 'dd/MM/yyyy HH:mm')}">Fecha</td>
-                            <td>
-                                <span class="badge"
-                                      th:classappend="${i.resultado == 'CONFORME'} ? 'bg-success' : 'bg-danger'"
-                                      th:text="${i.resultado}">CONFORME</span>
-                            </td>
-                            <td th:text="${i.observaciones}">Obs</td>
-                        </tr>
-                        </tbody>
-                    </table>
+
+        <!-- Bitácora de Inspecciones -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
+                    <span class="fw-bold">🗂️ Bitácora de Inspecciones Realizadas</span>
+                    <input type="text" id="filtroInspecciones" class="form-control form-control-sm" style="max-width: 260px;"
+                           placeholder="🔍 Buscar por bus, inspector o resultado...">
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${#lists.isEmpty(inspecciones)}" class="text-center py-5 text-muted">
+                        <p class="mb-0 fw-semibold">No hay inspecciones registradas</p>
+                    </div>
+
+                    <div class="table-responsive" th:unless="${#lists.isEmpty(inspecciones)}">
+                        <table class="table table-hover align-middle mb-0" id="tablaInspecciones">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Unidad</th>
+                                <th>Tipo</th>
+                                <th>Odómetro</th>
+                                <th>Inspector</th>
+                                <th>Fecha</th>
+                                <th>Resultado</th>
+                                <th>Observaciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="i : ${inspecciones}">
+                                <td class="text-muted" th:text="${i.idInspeccion}">1</td>
+                                <td class="fw-bold" th:text="${i.unidadDescripcion}">CH-102</td>
+                                <td>
+                                    <span class="badge bg-light text-dark border" th:text="${i.tipoInspeccion}">RUTINARIA</span>
+                                </td>
+                                <td class="fw-semibold" th:text="${#numbers.formatInteger(i.kilometrajeRegistrado, 1, 'COMMA')} + ' km'">100,000 km</td>
+                                <td th:text="${i.inspectorNombre}">Inspector</td>
+                                <td class="small text-muted" th:text="${#temporals.format(i.fechaInspeccion, 'dd/MM/yyyy HH:mm')}">Fecha</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${i.resultado == 'CONFORME'} ? 'bg-success' : (${i.resultado == 'CON_OBSERVACIONES'} ? 'bg-warning text-dark' : 'bg-danger')"
+                                          th:text="${i.resultado}">CONFORME</span>
+                                </td>
+                                <td class="small" th:text="${i.observaciones}">Obs</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
 <footer th:replace="~{fragments/layout :: scripts}"></footer>
+<script>
+    const selectUnidad = document.getElementById('selectUnidadInspeccion');
+    const inputKm = document.getElementById('inputKilometraje');
+
+    function actualizarMinKm() {
+        if (!selectUnidad || !inputKm) return;
+        const opcion = selectUnidad.options[selectUnidad.selectedIndex];
+        const kmActual = parseInt(opcion?.getAttribute('data-km') || '0', 10);
+
+        if (selectUnidad.value) {
+            inputKm.min = kmActual;
+            if (!inputKm.value || parseInt(inputKm.value, 10) < kmActual) {
+                inputKm.value = kmActual;
+            }
+        } else {
+            inputKm.min = 0;
+        }
+    }
+
+    if (selectUnidad) {
+        selectUnidad.addEventListener('change', actualizarMinKm);
+        actualizarMinKm();
+    }
+
+    const filtroInsp = document.getElementById('filtroInspecciones');
+    if (filtroInsp) {
+        filtroInsp.addEventListener('keyup', function () {
+            const texto = this.value.toLowerCase();
+            document.querySelectorAll('#tablaInspecciones tbody tr').forEach(fila => {
+                fila.style.display = fila.textContent.toLowerCase().includes(texto) ? '' : 'none';
+            });
+        });
+    }
+</script>
 </body>
 </html>

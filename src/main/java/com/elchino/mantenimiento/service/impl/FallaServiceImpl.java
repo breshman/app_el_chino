@@ -5,6 +5,7 @@ import com.elchino.mantenimiento.dao.IHistorialMantenimientoDAO;
 import com.elchino.mantenimiento.dao.IUnidadDAO;
 import com.elchino.mantenimiento.dao.IUsuarioDAO;
 import com.elchino.mantenimiento.dto.FallaDTO;
+import com.elchino.mantenimiento.exception.BusinessException;
 import com.elchino.mantenimiento.exception.ResourceNotFoundException;
 import com.elchino.mantenimiento.model.Falla;
 import com.elchino.mantenimiento.model.HistorialMantenimiento;
@@ -15,36 +16,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Implementación de la capa de servicio para la gestión y priorización de fallas (Implementa CUS05).
- *
- * <p>Reglas de negocio implementadas:</p>
- * <ul>
- *     <li>Si el usuario que reporta tiene rol {@code CONDUCTOR}, la falla nace obligatoriamente con estado {@code REPORTADA}.</li>
- *     <li>Si la prioridad asignada o actualizada es {@code ALTA} o {@code CRITICA}, la unidad afectada
- *     pasa automáticamente al estado {@code EN_MANTENIMIENTO} y se genera un evento en {@code historial_mantenimiento} (QA-05).</li>
- * </ul>
- *
- * @author Desarrollador Backend Core (@BackendAgent)
- * @version 1.0.0
  */
 @Service
 public class FallaServiceImpl implements IFallaService {
+
+    private static final Set<String> PRIORIDADES_VALIDAS = Set.of("BAJA", "MEDIA", "ALTA", "CRITICA");
+    private static final Set<String> ESTADOS_VALIDOS = Set.of("REPORTADA", "EN_ATENCION", "RESUELTA", "CERRADA");
 
     private final IFallaDAO fallaDAO;
     private final IUnidadDAO unidadDAO;
     private final IUsuarioDAO usuarioDAO;
     private final IHistorialMantenimientoDAO historialDAO;
 
-    /**
-     * Constructor con inyección de dependencias DAO.
-     *
-     * @param fallaDAO     DAO de fallas.
-     * @param unidadDAO    DAO de unidades.
-     * @param usuarioDAO   DAO de usuarios.
-     * @param historialDAO DAO de historial de mantenimiento.
-     */
     public FallaServiceImpl(IFallaDAO fallaDAO,
                             IUnidadDAO unidadDAO,
                             IUsuarioDAO usuarioDAO,
@@ -55,34 +42,22 @@ public class FallaServiceImpl implements IFallaService {
         this.historialDAO = historialDAO;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<Falla> listarTodas() {
         return fallaDAO.listarTodas();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<Falla> listarActivas() {
         return fallaDAO.listarActivas();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Falla obtenerPorId(Integer idFalla) {
         return fallaDAO.buscarPorId(idFalla)
                 .orElseThrow(() -> new ResourceNotFoundException("No existe la falla con ID: " + idFalla));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public Falla registrarFalla(FallaDTO dto, String usernameReporta) {
@@ -92,6 +67,19 @@ public class FallaServiceImpl implements IFallaService {
         Usuario reportante = usuarioDAO.buscarPorUsername(usernameReporta)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario reportante no encontrado: " + usernameReporta));
 
+        String prioridadSolicitada = dto.getPrioridad() != null ? dto.getPrioridad().trim().toUpperCase() : "MEDIA";
+        if (!PRIORIDADES_VALIDAS.contains(prioridadSolicitada)) {
+            throw new BusinessException("Prioridad de falla no válida: " + prioridadSolicitada);
+        }
+
+        // Regla de seguridad: Un CONDUCTOR reporta fallas con prioridad inicial máxima MEDIA
+        // para que el Responsable de Mantenimiento evalúe si amerita sacar la unidad de ruta.
+        String prioridadFinal = prioridadSolicitada;
+        if ("CONDUCTOR".equalsIgnoreCase(reportante.getRol())
+                && ("ALTA".equals(prioridadSolicitada) || "CRITICA".equals(prioridadSolicitada))) {
+            prioridadFinal = "MEDIA";
+        }
+
         Falla falla = new Falla();
         falla.setIdUnidad(unidad.getIdUnidad());
         falla.setIdUsuarioReporta(reportante.getIdUsuario());
@@ -99,23 +87,17 @@ public class FallaServiceImpl implements IFallaService {
         falla.setTitulo(dto.getTitulo().trim());
         falla.setDescripcion(dto.getDescripcion().trim());
         falla.setSistemaAfectado(dto.getSistemaAfectado().trim());
-
-        String prioridad = dto.getPrioridad() != null ? dto.getPrioridad() : "MEDIA";
-        falla.setPrioridad(prioridad);
-        // Regla CUS05: Toda falla reportada (especialmente por CONDUCTOR) nace con estado REPORTADA
+        falla.setPrioridad(prioridadFinal);
         falla.setEstado("REPORTADA");
 
         Falla guardada = fallaDAO.insertar(falla);
 
-        // Regla CUS05 + QA-05: Si la prioridad es ALTA o CRITICA, cambiar estado de la unidad a EN_MANTENIMIENTO
-        aplicarCambioEstadoPorPrioridadAltaOCritica(unidad, prioridad, guardada.getTitulo(), reportante.getIdUsuario());
+        // Solo cambia la unidad a EN_MANTENIMIENTO si estaba OPERATIVA y la prioridad es ALTA/CRITICA
+        aplicarCambioEstadoPorPrioridadAltaOCritica(unidad, prioridadFinal, guardada.getTitulo(), reportante.getIdUsuario());
 
         return guardada;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public Falla priorizarFalla(Integer idFalla, String nuevaPrioridad, String nuevoEstado, String usernameEjecutor) {
@@ -125,29 +107,36 @@ public class FallaServiceImpl implements IFallaService {
         Usuario ejecutor = usuarioDAO.buscarPorUsername(usernameEjecutor)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario ejecutor no encontrado"));
 
-        String prioridadFinal = nuevaPrioridad != null ? nuevaPrioridad : falla.getPrioridad();
-        String estadoFinal = nuevoEstado != null ? nuevoEstado : falla.getEstado();
+        String prioridadFinal = (nuevaPrioridad != null && !nuevaPrioridad.isBlank())
+                ? nuevaPrioridad.trim().toUpperCase()
+                : falla.getPrioridad();
+        String estadoFinal = (nuevoEstado != null && !nuevoEstado.isBlank())
+                ? nuevoEstado.trim().toUpperCase()
+                : falla.getEstado();
+
+        if (!PRIORIDADES_VALIDAS.contains(prioridadFinal)) {
+            throw new BusinessException("Prioridad no válida: " + prioridadFinal);
+        }
+        if (!ESTADOS_VALIDOS.contains(estadoFinal)) {
+            throw new BusinessException("Estado de falla no válido: " + estadoFinal);
+        }
 
         fallaDAO.actualizarPrioridadYEstado(idFalla, prioridadFinal, estadoFinal);
         falla.setPrioridad(prioridadFinal);
         falla.setEstado(estadoFinal);
 
-        // Regla CUS05: Si el RESPONSABLE_MANTENIMIENTO asigna prioridad ALTA o CRITICA, pasar unidad a EN_MANTENIMIENTO
         aplicarCambioEstadoPorPrioridadAltaOCritica(unidad, prioridadFinal, falla.getTitulo(), ejecutor.getIdUsuario());
 
         return falla;
     }
 
-    /**
-     * Evalúa si la prioridad es {@code ALTA} o {@code CRITICA} y traslada la unidad a {@code EN_MANTENIMIENTO}
-     * insertando el registro de trazabilidad en {@code historial_mantenimiento} (CUS05 y QA-05).
-     */
     private void aplicarCambioEstadoPorPrioridadAltaOCritica(Unidad unidad,
                                                              String prioridad,
                                                              String tituloFalla,
                                                              Integer idUsuario) {
         if ("ALTA".equalsIgnoreCase(prioridad) || "CRITICA".equalsIgnoreCase(prioridad)) {
-            if (!"EN_MANTENIMIENTO".equalsIgnoreCase(unidad.getEstado())) {
+            // Solo se traslada a EN_MANTENIMIENTO si estaba OPERATIVA (no sobrescribe FUERA_DE_SERVICIO)
+            if ("OPERATIVA".equalsIgnoreCase(unidad.getEstado())) {
                 String estadoAnterior = unidad.getEstado();
                 unidadDAO.actualizarEstado(unidad.getIdUnidad(), "EN_MANTENIMIENTO");
 

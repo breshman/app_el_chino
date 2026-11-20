@@ -13,14 +13,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Controlador de ordenes de mantenimiento y agenda de tecnicos (CUS06, CUS11).
@@ -34,14 +38,6 @@ public class CtrlMantenimientos {
     private final IUsuarioService usuarioServicio;
     private final IFallaService fallaServicio;
 
-    /**
-     * Constructor del controlador.
-     *
-     * @param servicio        servicio de mantenimientos.
-     * @param unidadServicio  servicio de unidades.
-     * @param usuarioServicio servicio de usuarios.
-     * @param fallaServicio   servicio de fallas.
-     */
     public CtrlMantenimientos(IMantenimientoService servicio,
                               IUnidadService unidadServicio,
                               IUsuarioService usuarioServicio,
@@ -52,65 +48,50 @@ public class CtrlMantenimientos {
         this.fallaServicio = fallaServicio;
     }
 
-    /**
-     * Muestra la plantilla FrmProgramacion.
-     *
-     * @param model modelo MVC.
-     * @return vista FrmProgramacion.
-     */
     @GetMapping({"/mantenimientos", "/mantenimientos/programar"})
     public String vista(Model model) {
-        model.addAttribute("mantenimientos", servicio.listarTodos());
-        model.addAttribute("unidades", unidadServicio.listarTodas());
-        model.addAttribute("tecnicos", usuarioServicio.listarTecnicosActivos());
-        model.addAttribute("fallasActivas", fallaServicio.listarActivas());
-        model.addAttribute("mantenimientoDTO", new MantenimientoDTO());
+        if (!model.containsAttribute("mantenimientoDTO")) {
+            model.addAttribute("mantenimientoDTO", new MantenimientoDTO());
+        }
+        cargarCatalogosVista(model);
         return "FrmProgramacion";
     }
 
-    /**
-     * Programa una orden desde la vista web validando horarios (CUS06).
-     *
-     * @param dto   datos de la orden.
-     * @param auth  sesion activa.
-     * @param flash atributos flash.
-     * @return redireccion a /mantenimientos.
-     */
     @PostMapping("/mantenimientos/programar")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESPONSABLE_MANTENIMIENTO')")
     public String programarWeb(@Valid @ModelAttribute("mantenimientoDTO") MantenimientoDTO dto,
+                               BindingResult result,
                                Authentication auth,
-                               RedirectAttributes flash) {
-        String autor = auth != null ? auth.getName() : "jefe.taller";
+                               RedirectAttributes flash,
+                               Model model) {
+        String autor = obtenerUsuarioAutenticado(auth);
+
+        if (result.hasErrors()) {
+            String errores = result.getFieldErrors().stream()
+                    .map(FieldError::getDefaultMessage)
+                    .collect(Collectors.joining("; "));
+            model.addAttribute("errorMensaje", "Revisa los datos de programación: " + errores);
+            cargarCatalogosVista(model);
+            return "FrmProgramacion";
+        }
+
         Mantenimiento m = servicio.programarMantenimiento(dto, autor);
         flash.addFlashAttribute("exitoMensaje",
                 "Mantenimiento #" + m.getIdMantenimiento() + " programado correctamente.");
         return "redirect:/mantenimientos";
     }
 
-    /**
-     * Marca el inicio de un mantenimiento desde la tabla web.
-     *
-     * @param id    ID del mantenimiento.
-     * @param auth  sesion activa.
-     * @param flash atributos flash.
-     * @return redireccion a /mantenimientos.
-     */
     @PostMapping("/mantenimientos/{id}/iniciar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESPONSABLE_MANTENIMIENTO', 'TECNICO')")
     public String iniciarWeb(@PathVariable("id") Integer id,
                              Authentication auth,
                              RedirectAttributes flash) {
-        String autor = auth != null ? auth.getName() : "tecnico1";
+        String autor = obtenerUsuarioAutenticado(auth);
         servicio.iniciarMantenimiento(id, autor);
-        flash.addFlashAttribute("exitoMensaje", "Mantenimiento #" + id + " en proceso.");
+        flash.addFlashAttribute("exitoMensaje", "Mantenimiento #" + id + " iniciado y en proceso.");
         return "redirect:/mantenimientos";
     }
 
-    /**
-     * Endpoint REST para listar todos los mantenimientos (CUS06, CUS11).
-     *
-     * @return lista JSON.
-     */
     @GetMapping("/api/v1/mantenimientos")
     @ResponseBody
     @Operation(summary = "Listar mantenimientos (CUS11)", description = "Retorna todas las ordenes de mantenimiento.")
@@ -119,13 +100,6 @@ public class CtrlMantenimientos {
         return ResponseEntity.ok(ApiResponseDTO.ok("Ordenes consultadas", servicio.listarTodos()));
     }
 
-    /**
-     * Endpoint REST para programar mantenimiento (CUS06).
-     *
-     * @param dto  datos de la orden.
-     * @param auth sesion activa.
-     * @return mantenimiento creado.
-     */
     @PostMapping("/api/v1/mantenimientos/programar")
     @ResponseBody
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESPONSABLE_MANTENIMIENTO')")
@@ -133,8 +107,22 @@ public class CtrlMantenimientos {
     @ApiResponse(responseCode = "201", description = "Programado")
     public ResponseEntity<ApiResponseDTO<Mantenimiento>> programarRest(@Valid @RequestBody MantenimientoDTO dto,
                                                                        Authentication auth) {
-        String autor = auth != null ? auth.getName() : "jefe.taller";
+        String autor = obtenerUsuarioAutenticado(auth);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDTO.ok("Mantenimiento programado", servicio.programarMantenimiento(dto, autor)));
+    }
+
+    private void cargarCatalogosVista(Model model) {
+        model.addAttribute("mantenimientos", servicio.listarTodos());
+        model.addAttribute("unidades", unidadServicio.listarTodas());
+        model.addAttribute("tecnicos", usuarioServicio.listarTecnicosActivos());
+        model.addAttribute("fallasActivas", fallaServicio.listarActivas());
+    }
+
+    private String obtenerUsuarioAutenticado(Authentication auth) {
+        if (auth == null || !auth.isAuthenticated() || auth.getName() == null) {
+            throw new AccessDeniedException("Debe iniciar sesión para ejecutar esta operación.");
+        }
+        return auth.getName();
     }
 }

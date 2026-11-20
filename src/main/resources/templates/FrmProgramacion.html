@@ -2,103 +2,219 @@
 <html lang="es" xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Programación de Mantenimientos')}"></head>
-<body>
+<body class="bg-light">
 <nav th:replace="~{fragments/layout :: navbar}"></nav>
 <div th:replace="~{fragments/layout :: alertas}"></div>
 
-<div class="container-fluid px-4">
-    <h3 class="fw-bold mb-3">📅 Programación de Mantenimientos (CUS06 / CUS11)</h3>
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h3 class="fw-bold mb-0">📅 Programación de Mantenimientos</h3>
+        <a th:href="@{/reparaciones}" class="btn btn-outline-success btn-sm">Ir a Reparaciones &rarr;</a>
+    </div>
+
     <div class="row g-4">
-        <div class="col-md-4" sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO')">
-            <div class="card shadow-sm">
-                <div class="card-header bg-success text-white fw-bold">Programar Orden (Valida Horario Técnico)</div>
+        <!-- Formulario de Programación -->
+        <div class="col-lg-4" sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO')">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white fw-bold py-3">
+                    🗓️ Programar Nueva Orden
+                </div>
                 <div class="card-body">
                     <form th:action="@{/mantenimientos/programar}" th:object="${mantenimientoDTO}" method="post">
-                        <div class="mb-2">
-                            <label class="form-label">Unidad</label>
-                            <select th:field="*{idUnidad}" class="form-select" required>
-                                <option th:each="u : ${unidades}" th:value="${u.idUnidad}"
-                                        th:text="${u.codigoInterno} + ' (' + ${u.placa} + ')'"></option>
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Falla Asociada (Opcional)</label>
-                            <select th:field="*{idFalla}" class="form-select">
-                                <option value="">-- Sin falla (Preventivo) --</option>
-                                <option th:each="f : ${fallasActivas}" th:value="${f.idFalla}"
-                                        th:text="'#' + ${f.idFalla} + ' - ' + ${f.unidadDescripcion} + ': ' + ${f.titulo}"></option>
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Técnico Asignado</label>
-                            <select th:field="*{idTecnico}" class="form-select" required>
-                                <option th:each="t : ${tecnicos}" th:value="${t.idUsuario}"
-                                        th:text="${t.nombreCompleto}"></option>
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Tipo</label>
-                            <select th:field="*{tipoMantenimiento}" class="form-select">
-                                <option value="CORRECTIVO">CORRECTIVO</option>
-                                <option value="PREVENTIVO">PREVENTIVO</option>
-                            </select>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Fecha y Hora Programada</label>
-                            <input type="datetime-local" th:field="*{fechaProgramada}" class="form-control" required>
-                        </div>
                         <div class="mb-3">
-                            <label class="form-label">Descripción del Trabajo</label>
-                            <textarea th:field="*{descripcionTrabajo}" class="form-control" rows="3" required></textarea>
+                            <label class="form-label fw-semibold">1. Falla Asociada (Opcional)</label>
+                            <select id="selectFallaProg" th:field="*{idFalla}" class="form-select">
+                                <option value="">-- Sin falla (Preventivo) --</option>
+                                <option th:each="f : ${fallasActivas}"
+                                        th:value="${f.idFalla}"
+                                        th:attr="data-unidad=${f.idUnidad}, data-titulo=${f.titulo}"
+                                        th:text="'#' + ${f.idFalla} + ' - ' + ${f.unidadDescripcion} + ': ' + ${f.titulo} + ' [' + ${f.prioridad} + ']'">
+                                </option>
+                            </select>
                         </div>
-                        <button type="submit" class="btn btn-success w-100">Programar Mantenimiento</button>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">2. Unidad a Intervenir *</label>
+                            <select id="selectUnidadProg" th:field="*{idUnidad}" class="form-select" required>
+                                <option value="">-- Selecciona un bus --</option>
+                                <option th:each="u : ${unidades}"
+                                        th:value="${u.idUnidad}"
+                                        th:disabled="${u.estado == 'FUERA_DE_SERVICIO'}"
+                                        th:text="${u.codigoInterno} + ' (' + ${u.placa} + ') - ' + ${u.estado}">
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">3. Tipo de Mantenimiento *</label>
+                            <select id="selectTipoProg" th:field="*{tipoMantenimiento}" class="form-select" required>
+                                <option value="PREVENTIVO">PREVENTIVO</option>
+                                <option value="CORRECTIVO">CORRECTIVO</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">4. Técnico Asignado *</label>
+                            <select th:field="*{idTecnico}" class="form-select" required>
+                                <option value="">-- Selecciona un técnico --</option>
+                                <option th:each="t : ${tecnicos}"
+                                        th:value="${t.idUsuario}"
+                                        th:text="${t.nombreCompleto}">
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">5. Fecha y Hora Programada *</label>
+                            <input type="datetime-local" id="inputFechaProg" th:field="*{fechaProgramada}" class="form-control" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">6. Descripción del Trabajo *</label>
+                            <textarea id="txtDescripcionProg" th:field="*{descripcionTrabajo}" class="form-control" rows="3" required
+                                      placeholder="Ej. Cambio de aceite de motor 15W-40, filtro de combustible y revisión de frenos..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                            ✔ Programar Mantenimiento
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-bold">Cronograma de Mantenimientos</div>
-                <div class="card-body table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Unidad</th>
-                            <th>Tipo</th>
-                            <th>Técnico</th>
-                            <th>Programado</th>
-                            <th>Trabajo</th>
-                            <th>Estado</th>
-                            <th>Acción</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="m : ${mantenimientos}">
-                            <td th:text="${m.idMantenimiento}">1</td>
-                            <td class="fw-bold" th:text="${m.unidadDescripcion}">CH-102</td>
-                            <td th:text="${m.tipoMantenimiento}">CORRECTIVO</td>
-                            <td th:text="${m.tecnicoNombre}">Técnico</td>
-                            <td th:text="${#temporals.format(m.fechaProgramada, 'dd/MM/yyyy HH:mm')}">Fecha</td>
-                            <td th:text="${m.descripcionTrabajo}">Trabajo</td>
-                            <td>
-                                <span class="badge"
-                                      th:classappend="${m.estado == 'FINALIZADO'} ? 'bg-success' : 'bg-warning text-dark'"
-                                      th:text="${m.estado}">PROGRAMADO</span>
-                            </td>
-                            <td>
-                                <a th:if="${m.estado != 'FINALIZADO'}"
-                                   th:href="@{/reparaciones(idMantenimiento=${m.idMantenimiento})}"
-                                   class="btn btn-sm btn-primary">Registrar Reparación</a>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+
+        <!-- Cronograma de Mantenimientos -->
+        <div th:class="${#authorization.expression('hasAnyRole(''ADMINISTRADOR'',''RESPONSABLE_MANTENIMIENTO'')')} ? 'col-lg-8' : 'col-12'">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
+                    <span class="fw-bold">🗓️ Cronograma de Órdenes de Mantenimiento</span>
+                    <div class="d-flex gap-2">
+                        <select id="filtroEstadoProg" class="form-select form-select-sm" style="width: 170px;">
+                            <option value="">Todos los estados</option>
+                            <option value="PROGRAMADO">PROGRAMADO</option>
+                            <option value="EN_PROCESO">EN_PROCESO</option>
+                            <option value="FINALIZADO">FINALIZADO</option>
+                            <option value="CANCELADO">CANCELADO</option>
+                        </select>
+                        <input type="text" id="filtroTextoProg" class="form-control form-control-sm" style="width: 220px;"
+                               placeholder="🔍 Buscar bus o técnico...">
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${#lists.isEmpty(mantenimientos)}" class="text-center py-5 text-muted">
+                        <p class="mb-0 fw-semibold">No hay mantenimientos programados</p>
+                    </div>
+
+                    <div class="table-responsive" th:unless="${#lists.isEmpty(mantenimientos)}">
+                        <table class="table table-hover align-middle mb-0" id="tablaMantenimientos">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Unidad</th>
+                                <th>Tipo</th>
+                                <th>Técnico</th>
+                                <th>Fecha Prog.</th>
+                                <th>Trabajo</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acción</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="m : ${mantenimientos}" th:attr="data-estado=${m.estado}">
+                                <td class="text-muted" th:text="${m.idMantenimiento}">1</td>
+                                <td class="fw-bold" th:text="${m.unidadDescripcion}">CH-102</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${m.tipoMantenimiento == 'CORRECTIVO'} ? 'bg-danger-subtle text-danger' : 'bg-info-subtle text-dark'"
+                                          th:text="${m.tipoMantenimiento}">CORRECTIVO</span>
+                                </td>
+                                <td th:text="${m.tecnicoNombre}">Técnico</td>
+                                <td class="small" th:text="${#temporals.format(m.fechaProgramada, 'dd/MM/yyyy HH:mm')}">Fecha</td>
+                                <td class="small" th:text="${m.descripcionTrabajo}">Trabajo</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${m.estado == 'FINALIZADO'} ? 'bg-success' : (${m.estado == 'EN_PROCESO'} ? 'bg-primary' : (${m.estado == 'CANCELADO'} ? 'bg-secondary' : 'bg-warning text-dark'))"
+                                          th:text="${m.estado}">PROGRAMADO</span>
+                                </td>
+                                <td class="text-end">
+                                    <form th:if="${m.estado == 'PROGRAMADO'}"
+                                          sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO','TECNICO')"
+                                          th:action="@{/mantenimientos/{id}/iniciar(id=${m.idMantenimiento})}"
+                                          method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+                                            ▶ Iniciar
+                                        </button>
+                                    </form>
+
+                                    <a th:if="${m.estado == 'EN_PROCESO'}"
+                                       sec:authorize="hasAnyRole('ADMINISTRADOR','RESPONSABLE_MANTENIMIENTO','TECNICO')"
+                                       th:href="@{/reparaciones(idMantenimiento=${m.idMantenimiento})}"
+                                       class="btn btn-sm btn-success text-nowrap">
+                                        🔧 Reparar
+                                    </a>
+
+                                    <span th:if="${m.estado == 'FINALIZADO'}" class="text-success small fw-semibold text-nowrap">
+                                        ✔ Completado
+                                    </span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
 <footer th:replace="~{fragments/layout :: scripts}"></footer>
+<script>
+    const selectFalla = document.getElementById('selectFallaProg');
+    const selectUnidad = document.getElementById('selectUnidadProg');
+    const selectTipo = document.getElementById('selectTipoProg');
+    const txtDesc = document.getElementById('txtDescripcionProg');
+
+    if (selectFalla && selectUnidad && selectTipo) {
+        selectFalla.addEventListener('change', function () {
+            const opcion = this.options[this.selectedIndex];
+            const idUnidad = opcion?.getAttribute('data-unidad');
+            const tituloFalla = opcion?.getAttribute('data-titulo');
+
+            if (this.value && idUnidad) {
+                selectUnidad.value = idUnidad;
+                selectTipo.value = 'CORRECTIVO';
+                if (txtDesc && !txtDesc.value.trim() && tituloFalla) {
+                    txtDesc.value = 'Atención correctiva: ' + tituloFalla;
+                }
+            } else {
+                selectTipo.value = 'PREVENTIVO';
+            }
+        });
+    }
+
+    const inputFecha = document.getElementById('inputFechaProg');
+    if (inputFecha) {
+        const ahora = new Date();
+        ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+        inputFecha.min = ahora.toISOString().slice(0, 16);
+    }
+
+    const filtroTexto = document.getElementById('filtroTextoProg');
+    const filtroEstado = document.getElementById('filtroEstadoProg');
+
+    function filtrarCronograma() {
+        const texto = (filtroTexto?.value || '').toLowerCase();
+        const estado = filtroEstado?.value || '';
+
+        document.querySelectorAll('#tablaMantenimientos tbody tr').forEach(fila => {
+            const coincideTexto = fila.textContent.toLowerCase().includes(texto);
+            const coincideEstado = !estado || fila.getAttribute('data-estado') === estado;
+            fila.style.display = (coincideTexto && coincideEstado) ? '' : 'none';
+        });
+    }
+
+    if (filtroTexto) filtroTexto.addEventListener('keyup', filtrarCronograma);
+    if (filtroEstado) filtroEstado.addEventListener('change', filtrarCronograma);
+</script>
 </body>
 </html>

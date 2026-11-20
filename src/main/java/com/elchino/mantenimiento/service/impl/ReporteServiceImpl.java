@@ -11,15 +11,14 @@ import com.elchino.mantenimiento.model.Mantenimiento;
 import com.elchino.mantenimiento.model.Unidad;
 import com.elchino.mantenimiento.service.IReporteService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
  * Implementación de la capa de servicio para la generación de reportes gerenciales
  * e indicadores operativos de la flota "El Chino" (Implementa CUS11 y CUS12).
- *
- * @author Desarrollador Backend Core (@BackendAgent)
- * @version 1.0.0
  */
 @Service
 public class ReporteServiceImpl implements IReporteService {
@@ -30,15 +29,6 @@ public class ReporteServiceImpl implements IReporteService {
     private final IRepuestoDAO repuestoDAO;
     private final IReparacionDAO reparacionDAO;
 
-    /**
-     * Constructor con inyección de los DAOs de cada módulo operativo.
-     *
-     * @param unidadDAO        DAO de unidades.
-     * @param fallaDAO         DAO de fallas.
-     * @param mantenimientoDAO DAO de mantenimientos.
-     * @param repuestoDAO      DAO de repuestos.
-     * @param reparacionDAO    DAO de reparaciones.
-     */
     public ReporteServiceImpl(IUnidadDAO unidadDAO,
                               IFallaDAO fallaDAO,
                               IMantenimientoDAO mantenimientoDAO,
@@ -51,38 +41,59 @@ public class ReporteServiceImpl implements IReporteService {
         this.reparacionDAO = reparacionDAO;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
+    @Transactional(readOnly = true)
     public ReporteResumenDTO obtenerResumenEjecutivo() {
         ReporteResumenDTO resumen = new ReporteResumenDTO();
 
+        // 1. Conteo de flota en una sola pasada
         List<Unidad> unidades = unidadDAO.listarTodas();
+        int operativas = 0;
+        int enMantenimiento = 0;
+        int fueraServicio = 0;
+        for (Unidad u : unidades) {
+            if ("OPERATIVA".equalsIgnoreCase(u.getEstado())) {
+                operativas++;
+            } else if ("EN_MANTENIMIENTO".equalsIgnoreCase(u.getEstado())) {
+                enMantenimiento++;
+            } else if ("FUERA_DE_SERVICIO".equalsIgnoreCase(u.getEstado())) {
+                fueraServicio++;
+            }
+        }
         resumen.setTotalUnidades(unidades.size());
-        resumen.setUnidadesOperativas((int) unidades.stream()
-                .filter(u -> "OPERATIVA".equalsIgnoreCase(u.getEstado())).count());
-        resumen.setUnidadesEnMantenimiento((int) unidades.stream()
-                .filter(u -> "EN_MANTENIMIENTO".equalsIgnoreCase(u.getEstado())).count());
-        resumen.setUnidadesFueraDeServicio((int) unidades.stream()
-                .filter(u -> "FUERA_DE_SERVICIO".equalsIgnoreCase(u.getEstado())).count());
+        resumen.setUnidadesOperativas(operativas);
+        resumen.setUnidadesEnMantenimiento(enMantenimiento);
+        resumen.setUnidadesFueraDeServicio(fueraServicio);
 
+        // 2. Conteo de fallas activas en una sola pasada
         List<Falla> fallasActivas = fallaDAO.listarActivas();
+        int criticasOAltas = 0;
+        for (Falla f : fallasActivas) {
+            if ("CRITICA".equalsIgnoreCase(f.getPrioridad()) || "ALTA".equalsIgnoreCase(f.getPrioridad())) {
+                criticasOAltas++;
+            }
+        }
         resumen.setFallasActivas(fallasActivas.size());
-        resumen.setFallasCriticasOAltas((int) fallasActivas.stream()
-                .filter(f -> "CRITICA".equalsIgnoreCase(f.getPrioridad()) || "ALTA".equalsIgnoreCase(f.getPrioridad()))
-                .count());
+        resumen.setFallasCriticasOAltas(criticasOAltas);
 
+        // 3. Conteo de órdenes de mantenimiento en una sola pasada
         List<Mantenimiento> todosMant = mantenimientoDAO.listarTodos();
-        resumen.setMantenimientosPendientes((int) todosMant.stream()
-                .filter(m -> "PROGRAMADO".equalsIgnoreCase(m.getEstado()) || "EN_PROCESO".equalsIgnoreCase(m.getEstado()))
-                .count());
-        resumen.setMantenimientosFinalizados((int) todosMant.stream()
-                .filter(m -> "FINALIZADO".equalsIgnoreCase(m.getEstado()))
-                .count());
+        int pendientes = 0;
+        int finalizados = 0;
+        for (Mantenimiento m : todosMant) {
+            if ("PROGRAMADO".equalsIgnoreCase(m.getEstado()) || "EN_PROCESO".equalsIgnoreCase(m.getEstado())) {
+                pendientes++;
+            } else if ("FINALIZADO".equalsIgnoreCase(m.getEstado())) {
+                finalizados++;
+            }
+        }
+        resumen.setMantenimientosPendientes(pendientes);
+        resumen.setMantenimientosFinalizados(finalizados);
 
+        // 4. Alertas de almacén y costo acumulado
         resumen.setRepuestosBajoStock(repuestoDAO.listarBajoStock().size());
-        resumen.setCostoTotalMantenimiento(reparacionDAO.calcularCostoTotalMantenimiento());
+        BigDecimal costoTotal = reparacionDAO.calcularCostoTotalMantenimiento();
+        resumen.setCostoTotalMantenimiento(costoTotal != null ? costoTotal : BigDecimal.ZERO);
 
         return resumen;
     }
