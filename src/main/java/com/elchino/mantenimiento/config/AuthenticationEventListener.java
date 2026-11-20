@@ -12,6 +12,10 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+/**
+ * Listener de eventos de Spring Security que controla el contador de intentos fallidos
+ * y aplica bloqueo temporal de 15 minutos tras 3 fallos consecutivos (RNF01 / QA-03).
+ */
 @Component
 public class AuthenticationEventListener {
 
@@ -21,10 +25,21 @@ public class AuthenticationEventListener {
 
     private final IUsuarioDAO usuarioDAO;
 
+    /**
+     * Constructor con inyección del DAO de usuarios.
+     *
+     * @param usuarioDAO DAO de acceso a la tabla {@code usuario}.
+     */
     public AuthenticationEventListener(IUsuarioDAO usuarioDAO) {
         this.usuarioDAO = usuarioDAO;
     }
 
+    /**
+     * Reinicia el contador de intentos fallidos y limpia la fecha de bloqueo
+     * cuando el usuario inicia sesión correctamente.
+     *
+     * @param event evento emitido por Spring Security tras autenticación exitosa.
+     */
     @EventListener
     public void onAuthenticationSuccess(AuthenticationSuccessEvent event) {
         String username = event.getAuthentication().getName();
@@ -36,6 +51,12 @@ public class AuthenticationEventListener {
         });
     }
 
+    /**
+     * Incrementa el contador de intentos fallidos ante credenciales incorrectas
+     * y bloquea la cuenta por 15 minutos al alcanzar el máximo permitido.
+     *
+     * @param event evento emitido por Spring Security ante fallo de contraseña.
+     */
     @EventListener
     public void onAuthenticationFailure(AuthenticationFailureBadCredentialsEvent event) {
         Object principal = event.getAuthentication().getPrincipal();
@@ -47,7 +68,6 @@ public class AuthenticationEventListener {
         Optional<Usuario> usuarioOpt = usuarioDAO.buscarPorUsername(username);
 
         usuarioOpt.ifPresent(usuario -> {
-            // Si ya había expirado un bloqueo previo, reiniciamos el contador desde 0
             int intentosPrevios = (usuario.getBloqueadoHasta() != null
                     && usuario.getBloqueadoHasta().isBefore(LocalDateTime.now()))
                     ? 0

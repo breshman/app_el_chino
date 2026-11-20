@@ -14,15 +14,33 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Collections;
 
+/**
+ * Servicio personalizado de Spring Security encargado de cargar los datos de
+ * autenticación, roles y estado de bloqueo temporal de los usuarios desde PostgreSQL (RNF01).
+ */
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final IUsuarioDAO usuarioDAO;
 
+    /**
+     * Constructor con inyección del DAO de usuarios.
+     *
+     * @param usuarioDAO DAO de acceso a la tabla {@code usuario}.
+     */
     public CustomUserDetailsService(IUsuarioDAO usuarioDAO) {
         this.usuarioDAO = usuarioDAO;
     }
 
+    /**
+     * Carga los detalles de autenticación de un usuario a partir de su {@code username}[cite: 1].
+     *
+     * @param username nombre de usuario ingresado en el formulario de login[cite: 1].
+     * @return instancia de {@link UserDetails} con authorities y estado de bloqueo[cite: 1].
+     * @throws UsernameNotFoundException si el usuario no existe[cite: 1].
+     * @throws LockedException           si la cuenta está temporalmente bloqueada tras 3 intentos fallidos[cite: 1].
+     * @throws DisabledException         si la cuenta se encuentra en estado {@code INACTIVO}.
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         Usuario usuario = usuarioDAO.buscarPorUsername(username.trim())
